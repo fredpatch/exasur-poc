@@ -2,7 +2,9 @@
 /**
  * print_organisme.php — Rapport d'une entité/organisme
  * BDD : quiz_app_du + si_anac
- * Adapté de la version AIR LAW pour les tables quiz_app_du
+ * 
+ * SEUIL UNIQUE : Score ≥ 70% = RÉUSSI / VALIDÉ
+ *                Score < 70% = ÉCHEC / AJOURNÉ
  */
 session_start();
 if (!isset($_SESSION['admin_id'])) { header("Location: login.php"); exit(); }
@@ -10,6 +12,8 @@ include '../php/db_connection.php';
 
 $idorga = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if (!$idorga) die("ID organisme manquant.");
+
+define('SEUIL_GLOBAL', 70);
 
 // Infos organisme (depuis si_anac)
 $orga = $conn->query("SELECT * FROM si_anac.organisme WHERE idorga=$idorga")->fetch_assoc();
@@ -56,9 +60,20 @@ $total_candidats = $conn->query("
     FROM si_anac.stagiaire s JOIN candidat c ON c.idstagiaire=s.idstagiaire
     WHERE s.idorga=$idorga
 ")->fetch_row()[0];
-$total_examens  = count(array_filter($rows, fn($r)=>$r['id_session']!==null));
-$total_reussites= count(array_filter($rows, fn($r)=>$r['reussite']==1));
-$taux = $total_examens>0 ? round($total_reussites/$total_examens*100,1) : 0;
+
+// Recalculer les statistiques selon seuil 70%
+$total_examens = 0;
+$total_reussites = 0;
+foreach ($rows as $r) {
+    if ($r['id_session'] !== null) {
+        $total_examens++;
+        // Recalculer réussite selon seuil 70%
+        if (floatval($r['pourcentage']) >= SEUIL_GLOBAL) {
+            $total_reussites++;
+        }
+    }
+}
+$taux = $total_examens > 0 ? round($total_reussites / $total_examens * 100, 1) : 0;
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -224,11 +239,11 @@ tbody td{padding:7px 10px;font-size:12px;vertical-align:middle;}
     </div>
     <div class="stat-box green">
       <div class="val"><?= $total_reussites ?></div>
-      <div class="lbl">Reçus</div>
+      <div class="lbl">Reçus (≥70%)</div>
     </div>
     <div class="stat-box red">
       <div class="val"><?= $total_examens - $total_reussites ?></div>
-      <div class="lbl">Échecs</div>
+      <div class="lbl">Échecs (<70%)</div>
     </div>
     <div class="stat-box gold">
       <div class="val"><?= $taux ?>%</div>
@@ -279,7 +294,7 @@ tbody td{padding:7px 10px;font-size:12px;vertical-align:middle;}
             <th>Note obtenue</th>
             <?php endif; ?>
             <th>Score</th>
-            <th>Résultat</th>
+            <th>Résultat (seuil 70%)</th>
             <th>Date</th>
           </tr>
         </thead>
@@ -293,6 +308,9 @@ tbody td{padding:7px 10px;font-size:12px;vertical-align:middle;}
             elseif($rang==2) $rc='rang-2';
             elseif($rang==3) $rc='rang-3';
           }
+          // Recalculer réussite selon seuil 70%
+          $pct = $r['pourcentage'] !== null ? floatval($r['pourcentage']) : null;
+          $reussite_calc = ($pct !== null && $pct >= SEUIL_GLOBAL);
         ?>
         <tr class="<?= $rc ?>">
           <td style="text-align:center;font-weight:700;color:#03224c">
@@ -315,44 +333,63 @@ tbody td{padding:7px 10px;font-size:12px;vertical-align:middle;}
           <?php if($typeCode==='IF'): ?>
           <td><?= $r['note_theorique']!==null?round($r['note_theorique'],1).'pts':' <span class="no-result">—</span>' ?></td>
           <td><?= $r['note_pratique']!==null?round($r['note_pratique'],1).'pts':'<span class="no-result">—</span>' ?></td>
-          <td style="font-weight:700;color:#03224c"><?= $r['moyenne_if']!==null?round($r['moyenne_if'],1).'%':'<span class="no-result">—</span>' ?></td>
+          <td style="font-weight:700;color:#03224c">
+            <?php 
+            $moy_if = null;
+            if ($r['moyenne_if'] !== null) {
+                $moy_if = round($r['moyenne_if'],1);
+            } elseif ($r['note_theorique'] !== null && $r['note_pratique'] !== null) {
+                $moy_if = round((floatval($r['note_theorique']) + floatval($r['note_pratique'])) / 2, 1);
+            }
+            echo $moy_if !== null ? $moy_if.'%' : '<span class="no-result">—</span>';
+            ?>
+           </span></td>
           <?php else: ?>
           <td style="font-weight:700;color:#03224c">
             <?= $r['note_finale']!==null ? round($r['note_finale'],1).'/'.round($r['note_sur'],1).' pts' : '<span class="no-result">Non passé</span>' ?>
-          </td>
+           </span></td>
           <?php endif; ?>
           <td><?= $r['pourcentage']!==null?round($r['pourcentage'],1).'%':'—' ?></td>
           <td>
             <?php if($r['pourcentage']===null): ?>
             <span class="badge-na">—</span>
-            <?php elseif($r['reussite']): ?>
-            <span class="badge-ok">✓ Reçu</span>
+            <?php elseif($reussite_calc): ?>
+            <span class="badge-ok">✓ RÉUSSI (≥70%)</span>
             <?php else: ?>
-            <span class="badge-ko">✗ Échec</span>
+            <span class="badge-ko">✗ ÉCHEC (<70%)</span>
             <?php endif; ?>
             <?php if($r['locked']&&$r['reason']): ?>
             <div style="font-size:10px;color:#dc2626;margin-top:2px">⚠ <?= htmlspecialchars($r['reason']) ?></div>
             <?php endif; ?>
-          </td>
+           </span></span></td>
           <td style="color:#6b7280;font-size:11px">
             <?= $r['date_fin']?date('d/m/Y H:i',strtotime($r['date_fin'])):'—' ?>
-          </td>
-        </tr>
+           </span></td>
+         </tr>
         <?php if($r['pourcentage']!==null) $rang++; endforeach; ?>
         </tbody>
       </table>
 
-      <!-- Résumé du groupe -->
+      <!-- Résumé du groupe avec seuil 70% -->
       <?php
-      $nb_p=count(array_filter($typeRows,fn($r)=>$r['pourcentage']!==null));
-      $nb_ok=count(array_filter($typeRows,fn($r)=>$r['reussite']==1));
+      $nb_p = 0;
+      $nb_ok = 0;
+      foreach ($typeRows as $r) {
+          if ($r['pourcentage'] !== null) {
+              $nb_p++;
+              if (floatval($r['pourcentage']) >= SEUIL_GLOBAL) {
+                  $nb_ok++;
+              }
+          }
+      }
+      $taux_groupe = $nb_p > 0 ? round($nb_ok / $nb_p * 100, 1) : 0;
       ?>
       <div style="background:#f8fafc;padding:8px 14px;border:1px solid #e5e7eb;border-top:none;font-size:11px;color:#6b7280;display:flex;gap:20px">
         <span>Passés : <strong><?= $nb_p ?></strong></span>
-        <span style="color:#166534">Reçus : <strong><?= $nb_ok ?></strong></span>
-        <span style="color:#991b1b">Échecs : <strong><?= $nb_p-$nb_ok ?></strong></span>
+        <span style="color:#166534">Reçus (≥70%) : <strong><?= $nb_ok ?></strong></span>
+        <span style="color:#991b1b">Échecs (<70%) : <strong><?= $nb_p-$nb_ok ?></strong></span>
         <?php if($nb_p>0): ?>
-        <span style="color:#b45309">Taux : <strong><?= round($nb_ok/$nb_p*100,1) ?>%</strong></span>
+        <span style="color:#b45309">Taux : <strong><?= $taux_groupe ?>%</strong></span>
         <?php endif; ?>
       </div>
     </div>
@@ -366,7 +403,7 @@ tbody td{padding:7px 10px;font-size:12px;vertical-align:middle;}
     <div>
       <img src="../assets/images/Logo-ANAC-CERTIFICATION.png" alt="ANAC"
            style="height:28px;vertical-align:middle;margin-right:8px" onerror="this.style.display='none'">
-      <strong style="color:#03224c">ANAC GABON</strong> — Système AIR SECURE
+      <strong style="color:#03224c">ANAC GABON</strong> — Système EXASUR
     </div>
     <div>Rapport généré le <?= date('d/m/Y à H:i') ?></div>
     <div style="font-size:10px;color:#9ca3af">Confidentiel</div>

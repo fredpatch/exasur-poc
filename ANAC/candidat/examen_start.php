@@ -7,6 +7,14 @@
  *  examen.php     = UNIQUEMENT IF Pratique (images scanner)
  *  examen_qcm.php = AS · IF Théorie · INST · SENS · FORM
  *
+ * DURÉES CORRIGÉES :
+ *  - AS (type 1) : 90 minutes (1h30)
+ *  - IF Théorie (type 2 + type_session='theorie') : 90 minutes (1h30)
+ *  - IF Pratique (type 2 + type_session='pratique') : 60 minutes (1h)
+ *  - INST (type 3) : 90 minutes (1h30)
+ *  - SENS (type 4) : 90 minutes (1h30)
+ *  - FORM (type 5) : variable selon configuration
+ *
  * Si temp_auth absent → message clair, PAS de boucle de redirections
  * Si résultat fantôme → nettoyage automatique
  * Si résultat complet → afficher résultat
@@ -194,14 +202,29 @@ if ($ps_row->num_rows > 0) {
     }
     $ip->execute();
     $ip->close();
-    /* PAS de pré-init reponses_candidat → save_reponse.php insère au fil du QCM */
 }
 $ps->close();
 
-/* ── Session PHP définitive ───────────────────────────────── */
+/* ════════════════════════════════════════════════════════════
+   DURÉES CORRIGÉES PAR TYPE D'EXAMEN
+   ════════════════════════════════════════════════════════════ */
 $duree_min = intval($type_info['duree_minutes'] ?? 90);
-if ($a_deux_parties == 1 && $idtype_examen == 2) $duree_min = 60;
 
+// Forcer les durées spécifiques selon le type et l'épreuve
+if ($idtype_examen == 2) {
+    // IF
+    if ($type_session === 'pratique') {
+        $duree_min = 60;  // IF Pratique : 1 heure
+    } elseif ($type_session === 'theorie') {
+        $duree_min = 90;  // IF Théorie : 1h30
+    }
+} elseif (in_array($idtype_examen, [1, 3, 4])) {
+    // AS, INST, SENS : 1h30
+    $duree_min = 90;
+}
+// FORM (type 5) garde la valeur de la BDD
+
+/* ── Session PHP définitive ───────────────────────────────── */
 $_SESSION['idcandidat']     = $idcandidat;
 $_SESSION['code_acces']     = $temp['code_acces'];
 $_SESSION['idtype_examen']  = $idtype_examen;
@@ -248,15 +271,14 @@ if ($idtype_examen == 2 && $type_session === 'pratique') {
 exit();
 
 /* ════════════════════════════════════════════════════════════
-   PAGE D'ERREUR SWAL — avec bouton pour quitter librement
-   Le candidat voit le message et clique lui-même pour partir
+   PAGE D'ERREUR SWAL
 ════════════════════════════════════════════════════════════ */
 function page_erreur(string $titre, string $message, string $retour, string $type = 'error'): void
 {
     $t   = json_encode($titre,   JSON_UNESCAPED_UNICODE);
     $m   = json_encode($message, JSON_UNESCAPED_UNICODE);
     $r   = htmlspecialchars($retour, ENT_QUOTES, 'UTF-8');
-    $ico = $type; // 'error' | 'warning' | 'info'
+    $ico = $type;
     ?>
     <!DOCTYPE html>
     <html lang="fr">
@@ -289,7 +311,6 @@ function page_erreur(string $titre, string $message, string $retour, string $typ
             confirmButtonColor: '#03224c',
             confirmButtonText: '<i class="fas fa-arrow-left" style="margin-right:6px;"></i>Retour',
             allowOutsideClick: false,
-            /* Le candidat décide lui-même de cliquer */
             showCloseButton: false
         }).then(function() {
             window.location.href = '<?= $r ?>';

@@ -5,6 +5,9 @@
  * - FORM : colonnes par module + total
  * - AS/INST/SENS : tableau standard note + % + décision
  * Toujours classement par mérite (pourcentage décroissant)
+ * 
+ * SEUIL UNIQUE : Score ≥ 70% = RÉUSSI / VALIDÉ
+ *                Score < 70% = ÉCHEC / AJOURNÉ
  */
 session_start();
 if (!isset($_SESSION['admin_id'])) { header("Location: login.php"); exit(); }
@@ -12,6 +15,8 @@ include '../php/db_connection.php';
 
 $id = intval($_GET['id'] ?? 0);
 if (!$id) die("ID session manquant");
+
+define('SEUIL_GLOBAL', 70);
 
 /* ── Session principale ─────────────────────────────────────────────── */
 $se = $conn->query("
@@ -121,20 +126,20 @@ if ($code_type === 'FORM') {
     }
 }
 
-/* ── Calcul des statistiques pour la synthèse ───────────────────────── */
+/* ── Calcul des statistiques pour la synthèse (basées sur seuil 70%) ── */
 $nb_ok = 0; $nb_exam = 0;
 foreach ($candidats as $cand) {
     $r = $res_main[$cand['idcandidat']] ?? null;
     if ($r) {
         $nb_exam++;
-        if ($r['reussite']) $nb_ok++;
+        // Recalculer réussite selon seuil 70%
+        if (floatval($r['pourcentage']) >= SEUIL_GLOBAL) $nb_ok++;
     }
 }
 $tx = $nb_exam > 0 ? round($nb_ok / $nb_exam * 100, 1) : 0;
 $nb_q = (int)$conn->query("SELECT COUNT(*) FROM session_questions WHERE session_id = $id")->fetch_row()[0];
 
 /* ── Construction du tableau de mérite (trié par pourcentage desc) ─── */
-// Calculer pour chaque candidat le score de classement
 $classement = [];
 foreach ($candidats as $cand) {
     $cid = $cand['idcandidat'];
@@ -323,7 +328,6 @@ body { background: #f0f2f5; padding: 20px; }
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
-    /* Forcer saut de page avant la synthèse sur grands tableaux */
     .synthese-wrap { page-break-before: auto; }
 }
 </style>
@@ -363,7 +367,7 @@ body { background: #f0f2f5; padding: 20px; }
   <div class="doc-sub">
     <?= htmlspecialchars($se['nom_session']) ?>
     | Du <?= date('d/m/Y', strtotime($se['date_debut'])) ?> au <?= date('d/m/Y', strtotime($se['date_fin'])) ?>
-    | Durée : <?= $se['duree_minutes'] ?> min | Seuil : <?= $se['seuil_reussite'] ?>%
+    | Durée : <?= $se['duree_minutes'] ?> min | Seuil : <?= SEUIL_GLOBAL ?>%
   </div>
   <?php endif; ?>
 
@@ -372,10 +376,10 @@ body { background: #f0f2f5; padding: 20px; }
     <div class="stat-b"><div class="stat-val"><?= $nb_candidats ?></div><div class="stat-lbl">Candidats</div></div>
     <div class="stat-b"><div class="stat-val"><?= $nb_q ?></div><div class="stat-lbl">Questions</div></div>
     <div class="stat-b" style="border-left-color:#16a34a">
-      <div class="stat-val" style="color:#16a34a"><?= $nb_ok ?></div><div class="stat-lbl">Reçus</div>
+      <div class="stat-val" style="color:#16a34a"><?= $nb_ok ?></div><div class="stat-lbl">Reçus (≥70%)</div>
     </div>
     <div class="stat-b" style="border-left-color:#dc2626">
-      <div class="stat-val" style="color:#dc2626"><?= $nb_exam - $nb_ok ?></div><div class="stat-lbl">Ajournés</div>
+      <div class="stat-val" style="color:#dc2626"><?= $nb_exam - $nb_ok ?></div><div class="stat-lbl">Ajournés (<70%)</div>
     </div>
     <div class="stat-b" style="border-left-color:#FFD700">
       <div class="stat-val" style="color:#d97706"><?= $tx ?>%</div><div class="stat-lbl">Taux réussite</div>
@@ -391,7 +395,7 @@ body { background: #f0f2f5; padding: 20px; }
   </div>
 
   <!-- ════════════════════════════════════════════════════════════════
-       TYPE IF : TABLEAU AVEC 2 PARTIES
+       TYPE IF : TABLEAU AVEC 2 PARTIES (seuil 70%)
   ═════════════════════════════════════════════════════════════════ -->
   <?php if ($code_type === 'IF'): ?>
 
@@ -427,10 +431,9 @@ body { background: #f0f2f5; padding: 20px; }
     <tbody>
     <?php $rang = 1; foreach ($classement as $row):
       $cid   = $row['cand']['idcandidat'];
-      $r     = $row['r_main'];   // résultat session principale
-      $rj    = $row['r_jum'];    // résultat session jumelle
+      $r     = $row['r_main'];
+      $rj    = $row['r_jum'];
 
-      // Identifier théo et prat
       if ($se['type_session'] === 'theorique') {
         $r_theo = $r;
         $r_prat = $rj;
@@ -445,8 +448,12 @@ body { background: #f0f2f5; padding: 20px; }
       if ($r_prat && $r_prat['moyenne_if'] !== null) $moy_if = round((float)$r_prat['moyenne_if'],1);
       elseif ($pct_theo !== null && $pct_prat !== null) $moy_if = round(($pct_theo+$pct_prat)/2,1);
 
-      $reussite_if = $r_theo && $r_theo['reussite'] && $r_prat && $r_prat['reussite'];
-      $pct_color = fn($p) => $p===null?'':($p>=80?'pct-ok':($p>=70?'pct-mid':'pct-ko'));
+      // RÈGLE UNIQUE : score >= 70% = réussi
+      $theo_reussite = ($pct_theo !== null && $pct_theo >= SEUIL_GLOBAL);
+      $prat_reussite = ($pct_prat !== null && $pct_prat >= SEUIL_GLOBAL);
+      $if_reussite = ($theo_reussite && $prat_reussite && $moy_if !== null && $moy_if >= SEUIL_GLOBAL);
+      
+      $pct_color = fn($p) => $p===null?'':($p>=SEUIL_GLOBAL?'pct-ok':($p>=SEUIL_GLOBAL-10?'pct-mid':'pct-ko'));
 
       $rang_cls = match($rang) { 1=>'rang-1', 2=>'rang-2', 3=>'rang-3', default=>'rang-n' };
     ?>
@@ -459,19 +466,19 @@ body { background: #f0f2f5; padding: 20px; }
       <?php if ($se['type_session'] === 'theorique'): ?>
       <td style="font-weight:700"><?= $r_theo ? round($r_theo['note_finale'],1).'/'.$r_theo['note_sur'].' pts' : '—' ?></td>
       <td class="<?= $pct_color($pct_theo) ?>"><?= $pct_theo !== null ? $pct_theo.'%' : '—' ?></td>
-      <td><?= $r_theo ? ($r_theo['reussite']?'<span class="res-ok">✅ RÉUSSI</span>':'<span class="res-ko">❌ AJOURNÉ</span>') : '—' ?></td>
+      <td><?= $pct_theo !== null ? ($theo_reussite ? '<span class="res-ok">✅ RÉUSSI</span>' : '<span class="res-ko">❌ AJOURNÉ</span>') : '—' ?></td>
       <?php if ($sess_prat): ?>
       <td style="font-weight:700"><?= $r_prat ? round($r_prat['note_finale'],1).'/'.$r_prat['note_sur'].' pts' : '—' ?></td>
       <td class="<?= $pct_color($pct_prat) ?>"><?= $pct_prat !== null ? $pct_prat.'%' : '—' ?></td>
       <td class="<?= $moy_if!==null?$pct_color($moy_if):'' ?>" style="font-weight:800"><?= $moy_if !== null ? $moy_if.'%' : '—' ?></td>
       <td><?php
         if (!$r_theo && !$r_prat) echo '—';
-        elseif ($reussite_if) echo '<span class="res-ok">🎓 ADMIS</span>';
+        elseif ($if_reussite) echo '<span class="res-ok">🎓 ADMIS</span>';
         else echo '<span class="res-ko">❌ AJOURNÉ</span>';
       ?></td>
       <?php endif; ?>
 
-      <?php else: // vue depuis la pratique ?>
+      <?php else: ?>
       <?php if ($sess_theo): ?>
       <td style="font-weight:700"><?= $r_theo ? round($r_theo['note_finale'],1).'/'.$r_theo['note_sur'].' pts' : '—' ?></td>
       <td class="<?= $pct_color($pct_theo) ?>"><?= $pct_theo !== null ? $pct_theo.'%' : '—' ?></td>
@@ -481,7 +488,7 @@ body { background: #f0f2f5; padding: 20px; }
       <td class="<?= $moy_if!==null?$pct_color($moy_if):'' ?>" style="font-weight:800"><?= $moy_if !== null ? $moy_if.'%' : '—' ?></td>
       <td><?php
         if (!$r_theo && !$r_prat) echo '—';
-        elseif ($reussite_if) echo '<span class="res-ok">🎓 ADMIS</span>';
+        elseif ($if_reussite) echo '<span class="res-ok">🎓 ADMIS</span>';
         else echo '<span class="res-ko">❌ AJOURNÉ</span>';
       ?></td>
       <?php endif; ?>
@@ -491,7 +498,7 @@ body { background: #f0f2f5; padding: 20px; }
   </table>
 
   <!-- ════════════════════════════════════════════════════════════════
-       TYPE FORM : TABLEAU PAR MODULE
+       TYPE FORM : TABLEAU PAR MODULE (seuil 70%)
   ═════════════════════════════════════════════════════════════════ -->
   <?php elseif ($code_type === 'FORM'): ?>
 
@@ -516,7 +523,6 @@ body { background: #f0f2f5; padding: 20px; }
     </thead>
     <tbody>
     <?php
-    // Re-trier par pourcentage global
     $classement_form = [];
     foreach ($candidats as $cand) {
       $cid = $cand['idcandidat'];
@@ -531,7 +537,8 @@ body { background: #f0f2f5; padding: 20px; }
     foreach ($classement_form as $row):
       $cid = $row['cand']['idcandidat'];
       $evs = $row['evs'];
-      $reussite_glob = !empty($evs) && !in_array(0, array_column($evs, 'reussite'));
+      // Recalculer réussite selon seuil 70%
+      $reussite_glob = !empty($evs) && !in_array(false, array_map(fn($e)=>floatval($e['pourcentage'])>=SEUIL_GLOBAL, $evs));
       $rang_cls = match($rang){1=>'rang-1',2=>'rang-2',3=>'rang-3',default=>'rang-n'};
     ?>
     <tr>
@@ -542,12 +549,13 @@ body { background: #f0f2f5; padding: 20px; }
       <?php foreach ($modules as $mod):
         $ev = $evs[$mod['idmodule']] ?? null;
         $pct_m = $ev ? round((float)$ev['pourcentage'],1) : null;
+        $mod_reussite = ($pct_m !== null && $pct_m >= SEUIL_GLOBAL);
       ?>
       <td style="font-weight:700"><?= $ev ? round($ev['note_obtenue'],2).'/'.$ev['note_sur'] : '—' ?></td>
-      <td class="<?= $pct_m!==null?($pct_m>=70?'pct-ok':'pct-ko'):'' ?>"><?= $pct_m!==null?$pct_m.'%':'—' ?></td>
+      <td class="<?= $mod_reussite?'pct-ok':'pct-ko' ?>"><?= $pct_m!==null?$pct_m.'%':'—' ?></td>
       <?php endforeach; ?>
       <td style="font-weight:800"><?= $row['total_s']>0?round($row['total_p'],2).'/'.$row['total_s']:'—' ?></td>
-      <td class="<?= $row['moy']>=70?'pct-ok':'pct-ko' ?>" style="font-weight:800"><?= $row['moy']>0?$row['moy'].'%':'—' ?></td>
+      <td class="<?= $row['moy']>=SEUIL_GLOBAL?'pct-ok':'pct-ko' ?>" style="font-weight:800"><?= $row['moy']>0?$row['moy'].'%':'—' ?></td>
       <td><?= empty($evs)?'—':($reussite_glob?'<span class="res-ok">✅ ADMIS</span>':'<span class="res-ko">❌ AJOURNÉ</span>') ?></td>
     </tr>
     <?php endforeach; ?>
@@ -555,7 +563,7 @@ body { background: #f0f2f5; padding: 20px; }
   </table>
 
   <!-- ════════════════════════════════════════════════════════════════
-       TYPE STANDARD : AS, INST, SENS
+       TYPE STANDARD : AS, INST, SENS (seuil 70%)
   ═════════════════════════════════════════════════════════════════ -->
   <?php else: ?>
 
@@ -577,7 +585,8 @@ body { background: #f0f2f5; padding: 20px; }
     <?php $rang=1; foreach ($classement as $row):
       $r = $row['r_main'];
       $pct = $r ? round((float)$r['pourcentage'],1) : null;
-      $pct_cls = $pct!==null?($pct>=(float)$se['seuil_reussite']?'pct-ok':'pct-ko'):'';
+      $reussite = ($pct !== null && $pct >= SEUIL_GLOBAL);
+      $pct_cls = $reussite ? 'pct-ok' : ($pct !== null ? 'pct-ko' : '');
       $rang_cls = match($rang){1=>'rang-1',2=>'rang-2',3=>'rang-3',default=>'rang-n'};
     ?>
     <tr>
@@ -591,7 +600,7 @@ body { background: #f0f2f5; padding: 20px; }
       <td class="<?= $pct_cls ?>"><?= $pct!==null?$pct.'%':'—' ?></td>
       <td><?php
         if (!$r) echo '—';
-        elseif ($r['reussite']) echo '<span class="res-ok">✅ RÉUSSI</span>';
+        elseif ($reussite) echo '<span class="res-ok">✅ RÉUSSI</span>';
         else echo '<span class="res-ko">❌ AJOURNÉ</span>';
       ?></td>
     </tr>
@@ -621,28 +630,28 @@ body { background: #f0f2f5; padding: 20px; }
       </thead>
       <tbody>
         <tr>
-          <td class="td-l">Type d'examen</td>
-          <td><strong><?= htmlspecialchars($se['tc'].' — '.$se['tn']) ?></strong></td>
-          <td class="td-l">Date(s) de session</td>
-          <td><?= date('d/m/Y',strtotime($se['date_debut'])) ?> → <?= date('d/m/Y',strtotime($se['date_fin'])) ?></td>
+          <td class="td-l">Type d'examen</span></td>
+          <td><strong><?= htmlspecialchars($se['tc'].' — '.$se['tn']) ?></strong></span></td>
+          <td class="td-l">Date(s) de session</span></td>
+          <td><?= date('d/m/Y',strtotime($se['date_debut'])) ?> → <?= date('d/m/Y',strtotime($se['date_fin'])) ?></span></td>
         </tr>
         <tr>
-          <td class="td-l">Nombre de candidats</td>
-          <td><strong><?= $nb_candidats ?></strong></td>
-          <td class="td-l">Nombre de questions</td>
-          <td><?= $nb_q ?></td>
+          <td class="td-l">Nombre de candidats</span></td>
+          <td><strong><?= $nb_candidats ?></strong></span></td>
+          <td class="td-l">Nombre de questions</span></td>
+          <td><?= $nb_q ?></span></td>
         </tr>
         <tr>
-          <td class="td-l">Candidats reçus</td>
-          <td class="pct-ok"><strong><?= $nb_ok ?></strong></td>
-          <td class="td-l">Candidats ajournés</td>
-          <td class="pct-ko"><strong><?= $nb_exam - $nb_ok ?></strong></td>
+          <td class="td-l">Candidats reçus (≥70%)</span></td>
+          <td class="pct-ok"><strong><?= $nb_ok ?></strong></span></td>
+          <td class="td-l">Candidats ajournés (<70%)</span></td>
+          <td class="pct-ko"><strong><?= $nb_exam - $nb_ok ?></strong></span></td>
         </tr>
         <tr class="total-row">
-          <td class="td-l">Taux de réussite</td>
-          <td class="<?= $tx>=(float)$se['seuil_reussite']?'pct-ok':'pct-ko' ?>"><strong><?= $tx ?>%</strong></td>
-          <td class="td-l">Seuil requis</td>
-          <td><strong><?= $se['seuil_reussite'] ?>%</strong></td>
+          <td class="td-l">Taux de réussite</span></td>
+          <td class="<?= $tx >= SEUIL_GLOBAL ? 'pct-ok' : 'pct-ko' ?>"><strong><?= $tx ?>%</strong></span></td>
+          <td class="td-l">Seuil requis</span></td>
+          <td><strong><?= SEUIL_GLOBAL ?>%</strong></span></td>
         </tr>
       </tbody>
     </table>
@@ -664,7 +673,7 @@ body { background: #f0f2f5; padding: 20px; }
         <p style="margin-top:5px;font-size:.84rem;opacity:.9"><?= $concl_txt ?></p>
         <p style="margin-top:4px;font-size:.8rem;opacity:.75">
           Session : <?= htmlspecialchars($se['nom_session']) ?> |
-          <?= $nb_ok ?>/<?= $nb_exam ?> candidat(s) admis |
+          <?= $nb_ok ?>/<?= $nb_exam ?> candidat(s) admis (≥<?= SEUIL_GLOBAL ?>%) |
           Taux : <?= $tx ?>%
         </p>
       </div>
@@ -672,7 +681,7 @@ body { background: #f0f2f5; padding: 20px; }
   </div>
 
   <div class="foot">
-    Document généré le <?= date('d/m/Y à H:i') ?> — Système AIR SECURE ANAC GABON — Confidentiel
+    Document généré le <?= date('d/m/Y à H:i') ?> — Système EXASUR ANAC GABON — Confidentiel
   </div>
 </div>
 </body>

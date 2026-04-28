@@ -2,7 +2,7 @@
 /**
  * questions.php v3 — EXASUR ANAC GABON
  * AJOUT : Bouton PDF dynamique qui respecte tous les filtres actifs
- *         (f_type, f_tq, f_q, f_sess, f_deb, f_fin)
+ * AJOUT : Bouton SUPPRIMER (uniquement si question non utilisée)
  */
 session_start();
 if (!isset($_SESSION['admin_id'])) { header("Location: login.php"); exit(); }
@@ -29,6 +29,39 @@ $CATS_SUSPECT = [
     4 => 'Matières explosives et substances inflammables',
     5 => 'Substances chimiques et toxiques',
 ];
+
+/* ── POST : Supprimer une question (vérification préalable) ── */
+if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action']??'')==='delete_q') {
+    $qid = intval($_POST['question_id'] ?? 0);
+    if ($qid) {
+        // Vérifier si la question est utilisée dans une session
+        $check = $conn->query("SELECT COUNT(*) AS cnt FROM session_questions WHERE question_id = $qid");
+        $used = $check ? $check->fetch_assoc()['cnt'] : 0;
+        
+        if ($used > 0) {
+            $_SESSION['q_err'] = "Cette question est utilisée dans $used session(s) d'examen et ne peut pas être supprimée.";
+        } else {
+            // Récupérer les images associées pour les supprimer du serveur
+            $img_q = $conn->query("SELECT images FROM question WHERE id = $qid");
+            if ($img_q && $row = $img_q->fetch_assoc()) {
+                $imgs = json_decode($row['images'], true);
+                if (is_array($imgs)) {
+                    foreach ($imgs as $img) {
+                        $file_path = '../assets/images/' . $img;
+                        if (file_exists($file_path)) {
+                            @unlink($file_path);
+                        }
+                    }
+                }
+            }
+            // Supprimer la question
+            $conn->query("DELETE FROM question WHERE id = $qid");
+            $_SESSION['q_msg'] = 'deleted';
+        }
+    }
+    header("Location: questions.php");
+    exit();
+}
 
 /* ── POST : Ajouter question ──────────────────────────────── */
 if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action']??'')==='add_q') {
@@ -154,13 +187,6 @@ $active_page='questions';
 .img-th:hover{transform:scale(1.15);}
 .opt-ok{color:#16a34a;font-weight:700;font-size:.84rem;}
 
-/* ════════════════════════════════════════════════════════════
-   BOUTON PDF DYNAMIQUE
-   ─────────────────────────────────────────────────────────
-   Positionné dans le card-admin-header à droite du badge.
-   Affiche le nombre de questions filtrées dans une pastille.
-   Couleur dorée ANAC pour se démarquer visuellement.
-════════════════════════════════════════════════════════════ */
 .btn-pdf-questions {
     display: inline-flex;
     align-items: center;
@@ -176,7 +202,7 @@ $active_page='questions';
     color: var(--blue, #03224c);
     box-shadow: 0 2px 10px rgba(212,175,55,.35);
     transition: all .22s ease;
-    margin-left: auto;  /* pousse le bouton à droite */
+    margin-left: auto;
     white-space: nowrap;
 }
 .btn-pdf-questions:hover {
@@ -196,20 +222,31 @@ $active_page='questions';
 }
 .btn-pdf-questions:hover .pdf-count { background: rgba(3,34,76,.35); }
 
-/* Tooltip filtre actifs sous le bouton */
 .pdf-filter-hint {
     font-size: .68rem;
     color: #9ca3af;
     margin-top: 3px;
     font-style: italic;
-    display: none;    /* affiché par JS si des filtres sont actifs */
+    display: none;
     text-align: right;
     padding-right: 2px;
 }
 .pdf-filter-hint.show { display: block; }
 .pdf-filter-hint i { color: var(--gold, #D4AF37); }
 
-/* ── TRADUCTION AUTOMATIQUE ── */
+/* Bouton supprimer */
+.btn-icon-delete {
+    background: #fee2e2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    margin-left: 5px;
+}
+.btn-icon-delete:hover {
+    background: #dc2626;
+    color: white;
+    border-color: #dc2626;
+}
+
 .trad-hint{font-size:.68rem;color:#6366f1;font-weight:600;background:#eef2ff;border:1px solid #c7d2fe;border-radius:50px;padding:1px 8px;margin-left:6px;vertical-align:middle;letter-spacing:.2px;}
 .btn-trad-manuel{font-size:.68rem;font-weight:700;color:#0891b2;background:#e0f9ff;border:1px solid #a5f3fc;border-radius:50px;padding:2px 9px;margin-left:6px;cursor:pointer;font-family:inherit;transition:all .2s;vertical-align:middle;}
 .btn-trad-manuel:hover{background:#0891b2;color:#fff;border-color:#0891b2;}
@@ -225,13 +262,11 @@ textarea.champ-fr,textarea.champ-en{padding-right:32px;}
 .trad-status-bar i{color:#6366f1;}
 @keyframes slideDown{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:translateY(0);}}
 
-/* Stats KPI */
 .stat-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;}
 .stat-c{flex:1;min-width:110px;background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 2px 10px rgba(3,34,76,.07);text-align:center;border-top:3px solid var(--gold);}
 .stat-c .num{font-size:1.7rem;font-weight:800;color:var(--blue);line-height:1;}
 .stat-c .lbl{font-size:.71rem;color:#6b7280;margin-top:4px;font-weight:600;text-transform:uppercase;}
 
-/* Filtres */
 .filter-ext{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;padding:14px 16px;background:var(--gray-bg);border-bottom:1px solid var(--gray-border);}
 .fg{display:flex;flex-direction:column;gap:3px;flex:1;min-width:120px;}
 .fg .fl{font-size:.73rem;font-weight:700;color:var(--blue);}
@@ -241,7 +276,6 @@ textarea.champ-fr,textarea.champ-en{padding-right:32px;}
 .btn-apply{background:var(--blue);color:#fff;}.btn-apply:hover{opacity:.9;}
 .btn-rst{background:#e8ecf5;color:var(--blue);border:1.5px solid #c8d0e0;}
 
-/* Zone IF pratique */
 .if-answer-zone{background:#fff0f0;border:2px solid #fecaca;border-radius:14px;padding:18px;}
 .if-answer-zone .label{font-weight:700;font-size:.88rem;color:#dc2626;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
 .radio-if{display:flex;flex-direction:column;gap:10px;margin-bottom:12px;}
@@ -259,7 +293,6 @@ textarea.champ-fr,textarea.champ-en{padding-right:32px;}
 .cat-opt input[type="radio"]{width:16px;height:16px;accent-color:#dc2626;flex-shrink:0;}
 .cat-opt label{cursor:pointer;font-size:.86rem;font-weight:600;color:#7f1d1d;}
 
-/* Upload images */
 .img-upload-zone{background:#f0f9ff;border:2px dashed #0891b2;border-radius:14px;padding:18px;margin-top:10px;}
 .zone-title{color:#0891b2;font-weight:700;font-size:.88rem;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
 .drop-zone{border:2px dashed #c8d0e0;border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all .2s;background:#fafbff;}
@@ -473,20 +506,12 @@ textarea.champ-fr,textarea.champ-en{padding-right:32px;}
         <h5>Liste des questions</h5>
         <span class="badge-count ms-2" id="badgeQ"><?= $nb_fi ?></span>
 
-        <!-- ══════════════════════════════════════════════════════
-             BOUTON PDF DYNAMIQUE
-             ──────────────────────────────────────────────────────
-             Construit l'URL de print_questions.php avec TOUS les
-             filtres actifs : type, épreuve, texte, session, dates.
-             Ouvre dans un nouvel onglet pour aperçu + impression.
-        ══════════════════════════════════════════════════════ -->
         <div style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;">
             <button class="btn-pdf-questions" id="btnPdfQ" onclick="ouvrirImpression()">
                 <i class="fas fa-file-pdf"></i>
                 <span>Imprimer / PDF</span>
                 <span class="pdf-count" id="pdfCount"><?= $nb_fi ?></span>
             </button>
-            <!-- Indication des filtres actifs sous le bouton -->
             <div class="pdf-filter-hint <?= ($ft||$ftq||$fq||$fsess||$fdeb||$ffin)?'show':'' ?>" id="pdfFilterHint">
                 <i class="fas fa-filter"></i>
                 Impression avec filtres actifs
@@ -555,10 +580,12 @@ textarea.champ-fr,textarea.champ-en{padding-right:32px;}
         <div style="overflow-x:auto;">
             <table class="table-admin" id="tblQ">
                 <thead>
-                    <tr><th>#</th><th>Type</th><th>Épreuve</th><th>Question</th><th>Images</th><th>Barème</th><th>Bonne réponse</th><th>Action</th></tr>
+                    <tr><th>#</th><th>Type</th><th>Épreuve</th><th>Question</th><th>Images</th><th>Barème</th><th>Bonne réponse</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
-                <?php $questions->data_seek(0); while($q=$questions->fetch_assoc()):
+                <?php 
+                $questions->data_seek(0); 
+                while($q=$questions->fetch_assoc()):
                     $imgs_q = !empty($q['images']) ? (json_decode($q['images'],true)??[]) : [];
                     $traits_q= !empty($q['images_traitements']) ? (json_decode($q['images_traitements'],true)??[]) : [];
                     $co = intval($q['correct_option']);
@@ -572,6 +599,14 @@ textarea.champ-fr,textarea.champ-en{padding-right:32px;}
                         $col_ok = 'option'.$co.'_fr';
                         $rep_ok = '✅ '.htmlspecialchars(mb_substr($q[$col_ok]??'',0,40));
                     }
+                    
+                    // Vérifier si la question est utilisée dans une session
+                    $check_used = $conn->query("SELECT COUNT(*) AS cnt FROM session_questions WHERE question_id = ".$q['id']);
+                    $used_count = $check_used ? $check_used->fetch_assoc()['cnt'] : 0;
+                    $can_delete = ($used_count == 0);
+                    
+                    // Échapper le texte pour JavaScript
+                    $q_text_clean = addslashes(htmlspecialchars($q['question_text_fr']));
                 ?>
                 <tr data-type="<?= $q['tc'] ?>" data-tq="<?= $q['type_question'] ?>"
                     data-s="<?= strtolower(htmlspecialchars($q['question_text_fr'])) ?>">
@@ -605,7 +640,7 @@ textarea.champ-fr,textarea.champ-en{padding-right:32px;}
                         if(count($imgs_q)>3): ?><small style="color:#9ca3af;">+<?= count($imgs_q)-3 ?></small><?php endif;
                         else: ?>—<?php endif; ?>
                     </td>
-                    <td style="font-weight:700;"><?= $q['bareme'] ?>pts</td>
+                    <td style="font-weight:700;"><?= $q['bareme'] ?>pts</span></td>
                     <td class="opt-ok" style="font-size:.82rem;max-width:200px;">
                         <?= $q['type_question']==='pratique'
                             ? htmlspecialchars($rep_ok)
@@ -613,6 +648,18 @@ textarea.champ-fr,textarea.champ-en{padding-right:32px;}
                     </td>
                     <td>
                         <a href="questions_edit.php?id=<?= $q['id'] ?>" class="btn-icon btn-icon-edit" title="Modifier"><i class="fas fa-edit"></i></a>
+                        <?php if ($can_delete): ?>
+                        <button type="button" class="btn-icon btn-icon-delete" 
+                                onclick="confirmDeleteQuestion(<?= $q['id'] ?>, '<?= $q_text_clean ?>')" 
+                                title="Supprimer">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                        <?php else: ?>
+                        <button type="button" class="btn-icon" style="background:#f3f4f6;color:#9ca3af;cursor:not-allowed;" 
+                                title="Question utilisée dans <?= $used_count ?> session(s) - Suppression impossible" disabled>
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endwhile; ?>
@@ -639,27 +686,70 @@ textarea.champ-fr,textarea.champ-en{padding-right:32px;}
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+// ════════════════════════════════════════════════════════════════════
+// FONCTION DE CONFIRMATION DE SUPPRESSION
+// ════════════════════════════════════════════════════════════════════
+function confirmDeleteQuestion(qid, questionText) {
+    Swal.fire({
+        title: '⚠️ Confirmation de suppression',
+        html: `<p>Voulez-vous vraiment supprimer la question <strong>#${qid}</strong> ?</p>
+               <div style="background:#f8f9fa;padding:12px;border-radius:8px;margin:10px 0;text-align:left;max-height:100px;overflow:auto;">
+                   <p style="font-size:.85rem;color:#374151;margin:0;">"${questionText.substring(0, 100)}${questionText.length > 100 ? '…' : ''}"</p>
+               </div>
+               <p style="color:#dc2626;font-size:.82rem;margin-top:10px;">
+                   <i class="fas fa-exclamation-triangle me-1"></i>
+                   Cette action est irréversible.
+               </p>`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: '<i class="fas fa-trash-alt me-1"></i>Oui, supprimer',
+        cancelButtonText: '<i class="fas fa-times me-1"></i>Annuler',
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#6b7280',
+        focusCancel: true,
+        reverseButtons: false
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Afficher un loader
+            Swal.fire({
+                title: 'Suppression en cours...',
+                html: '<i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i>',
+                allowOutsideClick: false,
+                showConfirmButton: false
+            });
+            
+            // Créer et soumettre le formulaire
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = 'questions.php';
+            form.style.display = 'none';
+            
+            const inputAction = document.createElement('input');
+            inputAction.type = 'hidden';
+            inputAction.name = 'action';
+            inputAction.value = 'delete_q';
+            
+            const inputId = document.createElement('input');
+            inputId.type = 'hidden';
+            inputId.name = 'question_id';
+            inputId.value = qid;
+            
+            form.appendChild(inputAction);
+            form.appendChild(inputId);
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+}
+
 document.getElementById('st').addEventListener('click',()=>document.getElementById('adminSidebar').classList.toggle('open'));
 const TRAITEMENTS=<?= json_encode($traitements) ?>;
 const CATS_SUSPECT=<?= json_encode($CATS_SUSPECT) ?>;
 
 /* ════════════════════════════════════════════════════════════════════
    BOUTON PDF — IMPRESSION DYNAMIQUE AVEC FILTRES
-   ─────────────────────────────────────────────────────────────────
-   Lit les valeurs actuelles des champs de filtre du formulaire,
-   construit l'URL de print_questions.php avec tous les paramètres,
-   puis ouvre un nouvel onglet pour aperçu + impression PDF.
-
-   Paramètres transmis à print_questions.php :
-     f_type  : idtype_examen sélectionné (int, 0 = tous)
-     f_tq    : theorique | pratique | '' (tous)
-     f_q     : texte de recherche
-     f_sess  : id_session (int, 0 = toutes)
-     f_deb   : date début (YYYY-MM-DD)
-     f_fin   : date fin   (YYYY-MM-DD)
 ════════════════════════════════════════════════════════════════════ */
 function ouvrirImpression() {
-    /* Récupérer les valeurs actuelles des filtres */
     const fType = document.querySelector('select[name="f_type"]')?.value  || '';
     const fTq   = document.querySelector('select[name="f_tq"]')?.value    || '';
     const fQ    = document.querySelector('input[name="f_q"]')?.value.trim() || '';
@@ -667,10 +757,7 @@ function ouvrirImpression() {
     const fDeb  = document.querySelector('input[name="f_deb"]')?.value    || '';
     const fFin  = document.querySelector('input[name="f_fin"]')?.value    || '';
 
-    /* Compter les filtres actifs pour l'affichage utilisateur */
     const filtresActifs = [fType,fTq,fQ,fSess,fDeb,fFin].filter(v=>v!=='').length;
-
-    /* Construire les paramètres URL */
     const params = new URLSearchParams();
     if (fType) params.set('f_type', fType);
     if (fTq)   params.set('f_tq',   fTq);
@@ -679,10 +766,7 @@ function ouvrirImpression() {
     if (fDeb)  params.set('f_deb',  fDeb);
     if (fFin)  params.set('f_fin',  fFin);
 
-    /* URL finale de print_questions.php */
     const url = 'print_questions.php' + (params.toString() ? '?' + params.toString() : '');
-
-    /* Confirmation SweetAlert2 si beaucoup de questions (pas de filtre) */
     const nbQuestions = parseInt(document.getElementById('pdfCount')?.textContent || '0');
 
     if (nbQuestions > 200 && filtresActifs === 0) {
@@ -700,31 +784,21 @@ function ouvrirImpression() {
             cancelButtonColor : '#6b7280',
         }).then(r => { if (r.isConfirmed) window.open(url, '_blank'); });
     } else {
-        /* Ouvrir directement dans un nouvel onglet */
         window.open(url, '_blank');
     }
 }
 
-/* ── Mettre à jour le compteur PDF en temps réel ────────────────
-   Observateur sur le badge filtrés (KPI) pour synchroniser
-   le compteur du bouton PDF dès que les filtres changent.          */
+/* Mise à jour compteur PDF */
 const kpiFi    = document.getElementById('kpi-fi');
 const pdfCount = document.getElementById('pdfCount');
-const pdfHint  = document.getElementById('pdfFilterHint');
-
 if (kpiFi && pdfCount) {
-    /* Observer les changements du KPI filtré */
-    const obs = new MutationObserver(() => {
-        pdfCount.textContent = kpiFi.textContent;
-    });
+    const obs = new MutationObserver(() => { pdfCount.textContent = kpiFi.textContent; });
     obs.observe(kpiFi, { childList: true, subtree: true, characterData: true });
 }
 
-/* Raccourci clavier : Ctrl+P → appeler ouvrirImpression() au lieu
-   de l'impression native du navigateur (optionnel, non bloquant)  */
+/* Raccourci Ctrl+P */
 document.addEventListener('keydown', function(e) {
     if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
-        /* Vérifier si on est sur la page questions */
         if (document.getElementById('btnPdfQ')) {
             e.preventDefault();
             ouvrirImpression();
@@ -924,8 +998,9 @@ document.addEventListener('DOMContentLoaded', function() { initTradAuto(); });
 
 /* ── Notifications ──────────────────────────────────────── */
 <?php if($qmsg==='ok'): ?>Swal.fire({title:'✅ Question ajoutée',icon:'success',timer:2500,timerProgressBar:true,showConfirmButton:false,position:'top-end',toast:true});<?php endif; ?>
+<?php if($qmsg==='deleted'): ?>Swal.fire({title:'🗑️ Question supprimée',text:'La question a été supprimée avec succès.',icon:'success',timer:2500,timerProgressBar:true,showConfirmButton:false,position:'top-end',toast:true});<?php endif; ?>
 <?php if($qerr==='pratique_refused'): ?>Swal.fire({icon:'warning',title:'⚠️ Non autorisé',text:'La pratique est réservée à l\'examen IF.',confirmButtonColor:'#03224c'});<?php endif; ?>
-<?php if($qerr && $qerr!=='pratique_refused'): ?>Swal.fire({title:'Erreur SQL',text:<?= json_encode($qerr) ?>,icon:'error',confirmButtonColor:'#dc2626'});<?php endif; ?>
+<?php if($qerr && $qerr!=='pratique_refused' && $qerr!=='deleted'): ?>Swal.fire({title:'Erreur',text:<?= json_encode($qerr) ?>,icon:'error',confirmButtonColor:'#dc2626'});<?php endif; ?>
 </script>
 </body>
 </html>

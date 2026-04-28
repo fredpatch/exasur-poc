@@ -1,12 +1,7 @@
 <?php
 /**
  * view_candidat.php — Fiche candidat EXASUR ANAC GABON
- * CORRECTIONS :
- *  - IF Théorie : vert si ≥70% (autorisé pratique), orange si entre 70 et 80%,
- *    rouge si <70% (ajourné). PAS rouge à 100% !
- *  - La barre IF théorie utilise le seuil 70% (accès pratique), pas 80% (réussite finale)
- *  - Logique réussite IF : théorie+pratique, moyenne ≥80% = validé
- *  - Candidat avec last_login : peut repasser sur une autre session
+ * SEUIL UNIQUE : 70% pour TOUS les examens (AS, IF, INST, SENS, FORM)
  */
 session_start();
 if (!isset($_SESSION['admin_id'])) { header("Location: login.php"); exit(); }
@@ -73,7 +68,6 @@ $active_page = 'candidats';
 .hist-item{padding:12px 16px;border-bottom:1px solid #f0f2f8;transition:background .2s;}
 .hist-item:hover{background:#f8faff;}
 .hist-item:last-child{border-bottom:none;}
-/* Barre de progression avec couleur selon contexte */
 .prog-bar-wrap{background:#e5e7eb;border-radius:20px;height:20px;overflow:hidden;}
 .prog-bar-fill{height:100%;border-radius:20px;font-size:.72rem;font-weight:700;
                display:flex;align-items:center;justify-content:center;color:#fff;
@@ -212,29 +206,16 @@ $active_page = 'candidats';
                     <p>Aucun examen passé</p>
                 </div>
                 <?php else: while ($r = $hist->fetch_assoc()):
-                    $p           = round(floatval($r['pourcentage']), 1);
-                    $seuil       = floatval($r['seuil_reussite'] ?? 80);
-                    $a2          = intval($r['a_deux_parties'] ?? 0);
-                    $ts          = $r['type_session'] ?? 'normal';
-                    $is_if_theo  = ($r['tc'] === 'IF' && $ts === 'theorie');
-
-                    /*
-                     * LOGIQUE COULEUR BARRE :
-                     * IF Théorie : le seuil pour accès pratique = 70%
-                     *   - ≥ 80% → vert (excellent)
-                     *   - ≥ 70% → orange (OK pour pratique, pas encore "réussi" final)
-                     *   - < 70% → rouge (ajourné théorie)
-                     *
-                     * IF Pratique / autres : rouge si échec, vert si réussite
-                     */
-                    if ($is_if_theo) {
-                        if ($p >= 80)      { $bar_color = '#16a34a'; $badge_col = 'badge-en_cours'; $badge_txt = '✅ Théorie Réussie'; }
-                        elseif ($p >= 70)  { $bar_color = '#d97706'; $badge_col = ''; $badge_txt = '⚠️ Pratique autorisée'; }
-                        else               { $bar_color = '#dc2626'; $badge_col = 'badge-annulee'; $badge_txt = '❌ Insuffisant'; }
-                    } else {
-                        if ($r['reussite']) { $bar_color = '#16a34a'; $badge_col = 'badge-en_cours'; $badge_txt = '✅ Réussi'; }
-                        else               { $bar_color = '#dc2626'; $badge_col = 'badge-annulee'; $badge_txt = '❌ Échec'; }
-                    }
+                    $p = round(floatval($r['pourcentage']), 1);
+                    $seuil = 70; // SEUIL UNIQUE 70%
+                    $ts = $r['type_session'] ?? 'normal';
+                    $is_if = ($r['tc'] === 'IF');
+                    
+                    // Règle unique : score >= 70% = validé
+                    $valide = ($p >= 70);
+                    $bar_color = $valide ? '#16a34a' : '#dc2626';
+                    $badge_txt = $valide ? '✅ Validé' : '❌ Ajourné';
+                    $badge_col = $valide ? 'badge-en_cours' : 'badge-annulee';
                 ?>
                 <div class="hist-item">
                     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
@@ -265,11 +246,9 @@ $active_page = 'candidats';
                                     <?= $p ?>%
                                 </div>
                             </div>
-                            <?php if ($is_if_theo): ?>
                             <div style="font-size:.68rem;color:#6b7280;margin-top:3px;">
-                                Seuil pratique : 70% · Seuil réussite finale IF : 80%
+                                Seuil de validation : 70%
                             </div>
-                            <?php endif; ?>
                             <?php if (!is_null($r['moyenne_if'])): ?>
                             <div style="font-size:.72rem;color:#6b7280;margin-top:2px;">
                                 Moyenne IF : <strong><?= round($r['moyenne_if'], 1) ?>%</strong>
@@ -321,6 +300,9 @@ $active_page = 'candidats';
                                 <div class="prog-bar-fill" style="width:<?= min($mp, 100) ?>%;background:<?= $mc ?>;">
                                     <?= $mp ?>%
                                 </div>
+                            </div>
+                            <div style="font-size:.68rem;color:#6b7280;margin-top:3px;">
+                                Seuil de validation : 70%
                             </div>
                         </div>
                         <div style="font-weight:700;color:var(--blue);min-width:72px;text-align:right;white-space:nowrap;">

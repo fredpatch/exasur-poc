@@ -31,11 +31,11 @@ $lang = [
 
     // ── Catégories ────────────────────────────────────────────────────
     'agent_surete'                  => 'Agent de Sûreté',
-    'agent_surete_desc'             => 'Certification des agents de sûreté aéroportuaire (50 QCM, seuil 80%)',
+    'agent_surete_desc'             => 'Certification des agents de sûreté aéroportuaire (50 QCM, seuil 70%)',
     'agent_if'                      => 'Agent Inspection Filtrage',
-    'agent_if_desc'                 => 'Certification théorique (50 QCM, seuil ≥70%) + pratique (images radiologiques, seuil 80% cumulé)',
+    'agent_if_desc'                 => 'Certification théorique (50 QCM, seuil ≥70%) + pratique (images radiologiques, seuil 70% cumulé)',
     'instructeur'                   => 'Instructeur AVSEC',
-    'instructeur_desc'              => 'Certification des instructeurs en sûreté de l\'aviation (50 QCM, seuil 80%)',
+    'instructeur_desc'              => 'Certification des instructeurs en sûreté de l\'aviation (50 QCM, seuil 70%)',
     'sensibilisation'               => 'Sensibilisation Sûreté',
     'sensibilisation_desc'          => 'Sensibilisation à la sûreté de l\'aviation civile (20 QCM, seuil 70%)',
     'formation'                     => 'Évaluation de Formation',

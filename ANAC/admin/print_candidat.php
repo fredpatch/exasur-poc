@@ -2,21 +2,8 @@
 /**
  * print_candidat.php — DOSSIER COMPLET DE RÉSULTATS — EXASUR ANAC GABON
  * ══════════════════════════════════════════════════════════════════════
- * Imprime l'intégralité des examens passés par un candidat :
- *  - Sommaire interactif avec ancres
- *  - Fiche identité candidat + statistiques globales
- *  - Pour chaque examen (du plus récent au plus ancien) :
- *      · Bandeau examen (type, session, date, résultat)
- *      · Récapitulatif (note, score, barre de progression)
- *      · Tableau détaillé des questions / réponses
- *      · Pour FORM  : un bloc par module
- *      · Pour IF    : synthèse théorie / pratique
- *  - Pied de page sécurisé
- *
- * SÉCURITÉ :
- *  - intval() sur tous les GET
- *  - Requêtes préparées via bind_param()
- *  - htmlspecialchars() sur toutes les sorties HTML
+ * SEUIL UNIQUE : Score ≥ 70% = RÉUSSI / VALIDÉ
+ *                Score < 70% = ÉCHEC / AJOURNÉ
  */
 
 session_start();
@@ -26,6 +13,9 @@ include '../php/db_connection.php';
 /* ── Paramètre ── */
 $id = intval($_GET['id'] ?? 0);
 if (!$id) die("Paramètre ID manquant.");
+
+/* SEUIL UNIQUE POUR TOUS LES EXAMENS */
+define('SEUIL_GLOBAL', 70);
 
 /* ════════════════════════════════════════════
    DONNÉES CANDIDAT
@@ -46,7 +36,7 @@ $stmt->close();
 if (!$c) die("Candidat introuvable.");
 
 /* ════════════════════════════════════════════
-   STATISTIQUES GLOBALES
+   STATISTIQUES GLOBALES (basées sur seuil 70%)
 ════════════════════════════════════════════ */
 $stmt = $conn->prepare("SELECT COUNT(*) FROM resultats WHERE idcandidat=? AND note_finale>0");
 $stmt->bind_param('i', $id); $stmt->execute();
@@ -89,6 +79,10 @@ while ($row = $rows_result->fetch_assoc()) {
 foreach ($examens as &$ex) {
     $ite     = intval($ex['ite']);
     $id_sess = intval($ex['id_session']);
+    
+    // Recalculer la réussite selon le seuil global 70%
+    $pct_calc = floatval($ex['pourcentage']);
+    $ex['reussite_calc'] = ($pct_calc >= SEUIL_GLOBAL) ? 1 : 0;
 
     if ($ite == 5) {
         /* ── FORM : charger les modules ── */
@@ -137,17 +131,20 @@ foreach ($examens as &$ex) {
                 while ($rr = $r2->fetch_assoc()) $rep_arr[] = $rr;
                 $s3->close();
                 $mod['reponses'] = $rep_arr;
+                // Recalculer réussite module selon seuil 70%
+                $mod_pct = floatval($mod['pourcentage']);
+                $mod['reussite_calc'] = ($mod_pct >= SEUIL_GLOBAL) ? 1 : 0;
                 $ex['modules'][] = $mod;
                 $tot += floatval($mod['pourcentage']); $nb++;
             }
             if ($nb > 0) {
                 $moy = round($tot / $nb, 1);
-                $ex['synth_form'] = ['moy'=>$moy,'reussite'=>($moy>=70),'nb'=>$nb];
+                $ex['synth_form'] = ['moy'=>$moy,'reussite'=>($moy>=SEUIL_GLOBAL),'nb'=>$nb];
             }
         }
 
     } elseif ($ite == 2) {
-        /* ── IF : réponses + synthèse théorie/pratique ── */
+        /* ── IF : réponses + synthèse théorie/pratique (seuil 70% pour chaque partie) ── */
         $s2 = $conn->prepare("
             SELECT q.*, rc.selected_option, rc.est_correcte
             FROM reponses_candidat rc
@@ -174,8 +171,14 @@ foreach ($examens as &$ex) {
         $if_res = $s2->get_result(); $s2->close();
         $theo = null; $prat = null;
         while ($rif = $if_res->fetch_assoc()) {
-            if ($rif['type_session']==='theorie'  && !$theo) $theo = $rif;
-            if ($rif['type_session']==='pratique' && !$prat) $prat = $rif;
+            if ($rif['type_session']==='theorie'  && !$theo) {
+                $rif['reussite_calc'] = (floatval($rif['pourcentage']) >= SEUIL_GLOBAL) ? 1 : 0;
+                $theo = $rif;
+            }
+            if ($rif['type_session']==='pratique' && !$prat) {
+                $rif['reussite_calc'] = (floatval($rif['pourcentage']) >= SEUIL_GLOBAL) ? 1 : 0;
+                $prat = $rif;
+            }
         }
         if ($theo || $prat) {
             $moy_if = ($theo && $prat)
@@ -185,9 +188,9 @@ foreach ($examens as &$ex) {
                 'theo'     => $theo,
                 'prat'     => $prat,
                 'moy'      => $moy_if,
-                'reussite' => ($moy_if!==null && $moy_if>=80
-                               && $theo && $theo['reussite']
-                               && $prat && $prat['reussite']),
+                'reussite' => ($moy_if !== null && $moy_if >= SEUIL_GLOBAL
+                               && $theo && $theo['reussite_calc']
+                               && $prat && $prat['reussite_calc']),
             ];
         }
 
@@ -217,7 +220,7 @@ function optVal(array $rep, int $n): ?string {
     $k = 'option'.$n.'_fr';
     return (isset($rep[$k]) && $rep[$k] !== '') ? $rep[$k] : null;
 }
-function barCol(float $p, float $s = 70): string {
+function barCol(float $p, float $s = SEUIL_GLOBAL): string {
     if ($p >= $s)           return '#16a34a';
     if ($p >= $s * 0.875)   return '#d97706';
     return '#dc2626';
@@ -607,15 +610,9 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
                 <?php foreach ($examens as $idx => $ex):
                     $num   = $idx + 1;
                     $pv    = round(floatval($ex['pourcentage']), 1);
-                    $seuil = floatval($ex['seuil_reussite'] ?? 70);
-                    $col   = barCol($pv, $seuil);
-                    $is_theo = ($ex['type_code']==='IF' && $ex['type_session']==='theorie');
-                    if ($is_theo && $pv>=70 && $pv<80)
-                        $rbadge = '<span class="badge-warn">⚠️ Pratique auto.</span>';
-                    elseif ($ex['reussite'])
-                        $rbadge = '<span class="badge-ok">✅ Réussi</span>';
-                    else
-                        $rbadge = '<span class="badge-ko">❌ Échec</span>';
+                    $col   = barCol($pv);
+                    // RÈGLE UNIQUE : Score >= 70% = RÉUSSI
+                    $reussite = ($pv >= 70);
                     $pt = '';
                     if ($ex['type_session']==='theorie')  $pt = '📖 Théorie';
                     elseif ($ex['type_session']==='pratique') $pt = '🖼️ Pratique';
@@ -650,7 +647,7 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
                             </div>
                         </div>
                     </td>
-                    <td><?= $rbadge ?></td>
+                    <td><?= $reussite ? '<span class="badge-ok">✅ RÉUSSI</span>' : '<span class="badge-ko">❌ ÉCHEC</span>' ?></td>
                 </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -665,19 +662,19 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
         $num     = $idx + 1;
         $ite     = intval($ex['ite']);
         $pv      = round(floatval($ex['pourcentage']), 1);
-        $seuil   = floatval($ex['seuil_reussite'] ?? 70);
-        $col     = barCol($pv, $seuil);
-        $is_ok   = intval($ex['reussite']);
+        $col     = barCol($pv);
+        // RÈGLE UNIQUE : Score >= 70% = RÉUSSI
+        $reussite = ($pv >= 70);
         $ts      = $ex['type_session'] ?? '';
         $is_theo = ($ex['type_code']==='IF' && $ts==='theorie');
 
-        /* Badge résultat */
-        if ($is_theo && $pv>=70 && $pv<80)
+        /* Badge résultat avec seuil 70% */
+        if ($is_theo && $pv>=70)
             $rbadge = '<span class="badge-warn" style="font-size:.76rem;">⚠️ Pratique autorisée</span>';
-        elseif ($is_ok)
-            $rbadge = '<span class="badge-ok" style="font-size:.76rem;">✅ RÉUSSI / PASS</span>';
+        elseif ($reussite)
+            $rbadge = '<span class="badge-ok" style="font-size:.76rem;">✅ RÉUSSI</span>';
         else
-            $rbadge = '<span class="badge-ko" style="font-size:.76rem;">❌ ÉCHEC / FAIL</span>';
+            $rbadge = '<span class="badge-ko" style="font-size:.76rem;">❌ ÉCHEC</span>';
 
         /* Chip partie */
         $pc = '';
@@ -755,24 +752,28 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
                     <div class="rstat" style="--rc:<?= $col ?>;">
                         <div class="rl"><i class="fas fa-percent" style="margin-right:2px;"></i>Score</div>
                         <div class="rv" style="--rc:<?= $col ?>;"><?= $pv ?>%</div>
-                        <div class="rsub">Seuil ≥ <?= $seuil ?>%</div>
+                        <div class="rsub">Seuil ≥ 70%</div>
                     </div>
-                    <?php if (!empty($ex['note_theorique']) && $ex['note_theorique'] > 0): ?>
-                    <div class="rstat" style="--rc:<?= ($ex['reussite_theo']??0)?'var(--green)':'var(--red)' ?>;">
+                    <?php if (!empty($ex['note_theorique']) && $ex['note_theorique'] > 0): 
+                        $theo_reussite = (floatval($ex['note_theorique'])/floatval($ex['note_sur'])*100) >= 70;
+                    ?>
+                    <div class="rstat" style="--rc:<?= $theo_reussite?'var(--green)':'var(--red)' ?>;">
                         <div class="rl"><i class="fas fa-book" style="margin-right:2px;"></i>Théorie</div>
                         <div class="rv"><?= round($ex['note_theorique'],1) ?> pts</div>
-                        <div class="rsub"><?= ($ex['reussite_theo']??0)?'✅ Validé':'❌ Insuffisant' ?></div>
+                        <div class="rsub"><?= $theo_reussite?'✅ Validé':'❌ Insuffisant' ?></div>
                     </div>
                     <?php endif; ?>
-                    <?php if (!empty($ex['note_pratique']) && $ex['note_pratique'] > 0): ?>
-                    <div class="rstat" style="--rc:<?= ($ex['reussite_prat']??0)?'var(--green)':'var(--red)' ?>;">
+                    <?php if (!empty($ex['note_pratique']) && $ex['note_pratique'] > 0): 
+                        $prat_reussite = (floatval($ex['note_pratique'])/floatval($ex['note_sur'])*100) >= 70;
+                    ?>
+                    <div class="rstat" style="--rc:<?= $prat_reussite?'var(--green)':'var(--red)' ?>;">
                         <div class="rl"><i class="fas fa-eye" style="margin-right:2px;"></i>Pratique</div>
                         <div class="rv"><?= round($ex['note_pratique'],1) ?> pts</div>
-                        <div class="rsub"><?= ($ex['reussite_prat']??0)?'✅ Validé':'❌ Insuffisant' ?></div>
+                        <div class="rsub"><?= $prat_reussite?'✅ Validé':'❌ Insuffisant' ?></div>
                     </div>
                     <?php endif; ?>
                     <?php if (!empty($ex['moyenne_if']) && $ex['moyenne_if'] > 0): ?>
-                    <div class="rstat" style="--rc:<?= ($ex['moyenne_if']>=80)?'var(--green)':'var(--red)' ?>;">
+                    <div class="rstat" style="--rc:<?= ($ex['moyenne_if']>=70)?'var(--green)':'var(--red)' ?>;">
                         <div class="rl"><i class="fas fa-calculator" style="margin-right:2px;"></i>Moy. IF</div>
                         <div class="rv"><?= round($ex['moyenne_if'],1) ?>%</div>
                         <div class="rsub">Théorie + Pratique</div>
@@ -787,7 +788,7 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
                 <div class="prog-lbl">
                     <span>0%</span>
                     <span style="color:<?= $col ?>;font-weight:700;">
-                        <?= $pv ?>% — Seuil : <?= $seuil ?>%
+                        <?= $pv ?>% — Seuil : 70%
                     </span>
                     <span>100%</span>
                 </div>
@@ -795,7 +796,7 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
                 <div style="font-size:.7rem;color:var(--grey);margin-top:6px;background:var(--orange-bg);
                      padding:5px 10px;border-radius:6px;border-left:3px solid var(--orange);">
                     <i class="fas fa-info-circle" style="color:var(--orange);margin-right:4px;"></i>
-                    IF Théorie : seuil d'accès pratique = 70% · seuil de réussite finale IF = 80%
+                    IF Théorie : seuil d'accès pratique = 70% · seuil de réussite finale IF = 70%
                 </div>
                 <?php endif; ?>
             </div>
@@ -813,7 +814,7 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
 
             <?php foreach ($ex['modules'] as $mod):
                 $mp  = round(floatval($mod['pourcentage']), 1);
-                $mok = intval($mod['reussite']);
+                $mok = ($mp >= 70);
                 $mc  = $mok ? 'var(--green)' : 'var(--red)';
             ?>
             <div class="mod-block">
@@ -942,7 +943,7 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
                     <tbody>
                     <?php foreach ($ex['modules'] as $mod):
                         $mp2=round(floatval($mod['pourcentage']),1);
-                        $mo2=intval($mod['reussite']); ?>
+                        $mo2=($mp2 >= 70); ?>
                     <tr>
                         <td>
                             <span style="background:var(--blue);color:#fff;padding:1px 7px;
@@ -959,18 +960,17 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
                                      style="width:<?= min($mp2,100) ?>%;background:<?= $mo2?'var(--green)':'var(--red)' ?>;"></div>
                             </div>
                         </td>
-                        <td>≥ 70%</td>
-                        <td><?= $mo2?'<span class="badge-ok">✅ Validé</span>'
-                                   :'<span class="badge-ko">❌ Insuffisant</span>' ?></td>
+                        <td>≥ 70%</div></span></td>
+                        <td><?= $mo2?'<span class="badge-ok">✅ Validé</span>':'<span class="badge-ko">❌ Insuffisant</span>' ?></td>
                     </tr>
                     <?php endforeach; ?>
                     <tr class="trow">
                         <td><i class="fas fa-calculator" style="color:var(--gold);margin-right:5px;"></i>
-                            MOYENNE GÉNÉRALE</td>
-                        <td>—</td>
+                            MOYENNE GÉNÉRALE</span></td>
+                        <td>—</span></td>
                         <td><strong style="color:<?= $sf2['reussite']?'var(--green)':'var(--red)' ?>;">
                             <?= $sf2['moy'] ?>%</strong></td>
-                        <td>≥ 70%</td>
+                        <td>≥ 70%</span></td>
                         <td><?= $sf2['reussite']
                             ?'<span class="badge-ok">✅ VALIDÉE</span>'
                             :'<span class="badge-ko">❌ NON VALIDÉE</span>' ?></td>
@@ -1070,42 +1070,42 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
                     <tr>
                         <td><i class="fas fa-book" style="color:#1e40af;margin-right:5px;"></i>
                             <strong>Théorie</strong></td>
-                        <?php if ($si['theo']): $t=$si['theo']; $pt=round($t['pourcentage'],1); ?>
-                        <td><?= round($t['note_finale'],1) ?>/<?= round($t['note_sur'],1) ?> pts</td>
+                        <?php if ($si['theo']): $t=$si['theo']; $pt=round($t['pourcentage'],1); 
+                              $t_reussite = ($pt >= 70); ?>
+                        <td><?= round($t['note_finale'],1) ?>/<?= round($t['note_sur'],1) ?> pts</span></td>
                         <td><?= $pt ?>%
                             <div class="mini-bar" style="margin:3px auto 0;">
                                 <div class="mini-fill" style="width:<?= min($pt,100) ?>%;
-                                     background:<?= $t['reussite']?'var(--green)':'var(--red)' ?>;"></div>
+                                     background:<?= $t_reussite?'var(--green)':'var(--red)' ?>;"></div>
                             </div></td>
-                        <td>≥ 80%</td>
-                        <td><?= $t['reussite']?'<span class="badge-ok">✅ Validée</span>'
-                                              :'<span class="badge-ko">❌ Insuffisant</span>' ?></td>
-                        <?php else: ?><td colspan="4" style="color:var(--grey);font-style:italic;">Non passée</td><?php endif; ?>
+                        <td>≥ 70%</span></td>
+                        <td><?= $t_reussite?'<span class="badge-ok">✅ Validée</span>':'<span class="badge-ko">❌ Insuffisant</span>' ?></td>
+                        <?php else: ?><td colspan="4" style="color:var(--grey);font-style:italic;">Non passée</span><?php endif; ?>
                     </tr>
                     <tr>
                         <td><i class="fas fa-eye" style="color:#9d174d;margin-right:5px;"></i>
-                            <strong>Pratique</strong></td>
-                        <?php if ($si['prat']): $p=$si['prat']; $pp=round($p['pourcentage'],1); ?>
-                        <td><?= round($p['note_finale'],1) ?>/<?= round($p['note_sur'],1) ?> pts</td>
+                            <strong>Pratique</strong></span></td>
+                        <?php if ($si['prat']): $p=$si['prat']; $pp=round($p['pourcentage'],1);
+                              $p_reussite = ($pp >= 70); ?>
+                        <td><?= round($p['note_finale'],1) ?>/<?= round($p['note_sur'],1) ?> pts</span></td>
                         <td><?= $pp ?>%
                             <div class="mini-bar" style="margin:3px auto 0;">
                                 <div class="mini-fill" style="width:<?= min($pp,100) ?>%;
-                                     background:<?= $p['reussite']?'var(--green)':'var(--red)' ?>;"></div>
+                                     background:<?= $p_reussite?'var(--green)':'var(--red)' ?>;"></div>
                             </div></td>
-                        <td>≥ 80%</td>
-                        <td><?= $p['reussite']?'<span class="badge-ok">✅ Validée</span>'
-                                              :'<span class="badge-ko">❌ Insuffisant</span>' ?></td>
-                        <?php else: ?><td colspan="4" style="color:var(--grey);font-style:italic;">Non passée</td><?php endif; ?>
+                        <td>≥ 70%</span></td>
+                        <td><?= $p_reussite?'<span class="badge-ok">✅ Validée</span>':'<span class="badge-ko">❌ Insuffisant</span>' ?></td>
+                        <?php else: ?><td colspan="4" style="color:var(--grey);font-style:italic;">Non passée</span><?php endif; ?>
                     </tr>
                     <tr class="trow">
                         <td><i class="fas fa-calculator" style="color:var(--gold);margin-right:5px;"></i>
-                            MOYENNE IF</td>
+                            MOYENNE IF</span></td>
                         <td colspan="2">
                             <strong style="color:<?= $si['reussite']?'var(--green)':'var(--red)' ?>;font-size:.92rem;">
                                 <?= ($si['moy']!==null)?$si['moy'].'%':'—' ?>
                             </strong>
                         </td>
-                        <td>≥ 80%</td>
+                        <td>≥ 70%</span></td>
                         <td><?= $si['reussite']
                             ?'<span class="badge-ok">✅ CERTIFIÉ(E)</span>'
                             :'<span class="badge-ko">❌ NON CERTIFIÉ(E)</span>' ?></td>
@@ -1115,8 +1115,8 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
                 <div class="<?= $si['reussite']?'sfoot-ok':'sfoot-ko' ?>">
                     <i class="fas fa-<?= $si['reussite']?'check-circle':'times-circle' ?>"></i>
                     <?= $si['reussite']
-                        ?'Certification IF VALIDÉE — Moyenne '.$si['moy'].'% ≥ 80% (théorie et pratique validées).'
-                        :'Certification IF NON VALIDÉE — Moyenne '.($si['moy']??'—').'% inférieure au seuil de 80% requis.' ?>
+                        ?'Certification IF VALIDÉE — Moyenne '.$si['moy'].'% ≥ 70% (théorie et pratique validées).'
+                        :'Certification IF NON VALIDÉE — Moyenne '.($si['moy']??'—').'% inférieure au seuil de 70% requis.' ?>
                 </div>
             </div>
             <?php endif; /* fin synth_if */ ?>

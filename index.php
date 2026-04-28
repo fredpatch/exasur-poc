@@ -2,6 +2,7 @@
 /**
  * index.php — Page d'accueil EXASUR
  * ANAC GABON — Direction de la Sûreté et de la Facilitation
+ * MODIFICATIONS : Seuil affiché 70% pour AS (type1), IF (type2), INST (type3)
  */
 session_start();
 include 'ANAC/lang/lang_loader.php';
@@ -453,6 +454,10 @@ while ($row = $res_sess->fetch_assoc()) {
             background: #fff3cd; color: #856404;
             border-color: #ffc107;
         }
+        .meta-tag.info {
+            background: #e0f2fe; color: #0369a1;
+            border-color: #bae6fd;
+        }
         .btn-cat {
             background: linear-gradient(135deg, var(--blue-deep), var(--blue-mid));
             color: white; border: none;
@@ -805,6 +810,20 @@ while ($row = $res_sess->fetch_assoc()) {
                     $dur = intval($info['duree_minutes']);
                     $duree_str = $dur >= 60 ? floor($dur/60).'h'.($dur%60?str_pad($dur%60,2,'0',STR_PAD_LEFT):'') : $dur.'min';
                 }
+
+                // Seuil affiché : 70% pour AS (1), IF (2), INST (3)
+                $seuil_original = $info['seuil_reussite'];
+                if (in_array($idtype, [1, 2, 3])) {
+                    $seuil_affiche = 70;
+                } else {
+                    $seuil_affiche = $seuil_original;
+                }
+
+                // Message info pour AS et INST (score masqué)
+                $info_message = '';
+                if (in_array($idtype, [1, 3]) && !$info['a_deux_parties']) {
+                    $info_message = '<span class="meta-tag info"><i class="fas fa-envelope"></i> Résultat confidentiel</span>';
+                }
             ?>
             <!-- Carte examen : <?php echo $info['code']; ?> -->
             <div class="reveal">
@@ -836,7 +855,8 @@ while ($row = $res_sess->fetch_assoc()) {
                             <?php else: ?>
                             <span class="meta-tag"><i class="fas fa-question-circle"></i> <?php echo $info['nb_questions_theorique']; ?> Q</span>
                             <?php endif; ?>
-                            <span class="meta-tag gold"><i class="fas fa-check-circle"></i> <?php echo $info['seuil_reussite']; ?>%</span>
+                            <span class="meta-tag gold"><i class="fas fa-check-circle"></i> <?php echo $seuil_affiche; ?>%</span>
+                            <?php echo $info_message; ?>
                             <?php if (!$has_sess): ?>
                             <span class="meta-tag no-sess"><i class="fas fa-calendar-times"></i> Aucune session</span>
                             <?php else: ?>
@@ -916,8 +936,8 @@ while ($row = $res_sess->fetch_assoc()) {
             <div class="reveal">
                 <div class="feat-card">
                     <div class="feat-icon"><i class="fas fa-certificate"></i></div>
-                    <div class="feat-title"><?php echo ($_SESSION['lang']=='fr') ? 'Résultat officiel' : 'Official resultat'; ?></div>
-                    <div class="feat-desc"><?php echo ($_SESSION['lang']=='fr') ? 'Résultats reconnus par  l\'ANAC GABON.' : 'Results recognized by ANAC GABON.'; ?></div>
+                    <div class="feat-title"><?php echo ($_SESSION['lang']=='fr') ? 'Résultat officiel' : 'Official result'; ?></div>
+                    <div class="feat-desc"><?php echo ($_SESSION['lang']=='fr') ? 'Résultats reconnus par l\'ANAC GABON.' : 'Results recognized by ANAC GABON.'; ?></div>
                 </div>
             </div>
             <div class="reveal">
@@ -1012,7 +1032,7 @@ while ($row = $res_sess->fetch_assoc()) {
 
 
 <!-- ══════════════════════════════════════════════════
-     MODAL : À PROPOS EXASUR (reécrit, sans PNSAC/OACI)
+     MODAL : À PROPOS EXASUR
 ══════════════════════════════════════════════════ -->
 <div class="modal-overlay" id="aboutModal" onclick="closeModalOutside(event,'aboutModal')">
     <div class="modal-box">
@@ -1073,7 +1093,7 @@ while ($row = $res_sess->fetch_assoc()) {
             </h6>
             <p>
                 <strong style="color:#16a34a;">✅ VALIDÉ</strong> —
-                <?php echo ($_SESSION['lang']=='fr') ? 'Le candidat a atteint le seuil requis. Son examen est validé.' : 'The candidate has met the required threshold. Examen is validated.'; ?>
+                <?php echo ($_SESSION['lang']=='fr') ? 'Le candidat a atteint le seuil requis. Son examen est validé.' : 'The candidate has met the required threshold. Exam is validated.'; ?>
                 <br>
                 <strong style="color:#dc2626;">⛔ AJOURNÉ</strong> —
                 <?php echo ($_SESSION['lang']=='fr') ? 'Le candidat n\'a pas atteint le seuil. Il est ajourné et pourra repasser l\'examen.' : 'The candidate did not meet the threshold. They are deferred and may retake the exam.'; ?>

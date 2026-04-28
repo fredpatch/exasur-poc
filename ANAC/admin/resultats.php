@@ -7,7 +7,7 @@ $f_sess  = intval($_GET['f_session']??0);
 $f_type  = intval($_GET['f_type']??0);
 $f_res   = isset($_GET['f_result'])&&$_GET['f_result']!=='' ? intval($_GET['f_result']) : null;
 $f_srch  = $conn->real_escape_string($_GET['f_search']??'');
-$f_cand  = intval($_GET['f_cand']??0); /* ← NOUVEAU : filtre par candidat */
+$f_cand  = intval($_GET['f_cand']??0);
 
 $w="WHERE 1=1";
 if($f_sess)        $w.=" AND r.id_session=$f_sess";
@@ -35,7 +35,6 @@ $sessions=$conn->query("SELECT id_session,nom_session FROM session_examen ORDER 
 $types_arr=[]; $tr=$conn->query("SELECT * FROM type_examen ORDER BY idtype_examen");
 while($t=$tr->fetch_assoc()) $types_arr[]=$t;
 
-/* NOUVEAU : liste candidats ayant au moins un résultat, pour filtre déroulant */
 $candidats_list=$conn->query("
     SELECT DISTINCT c.idcandidat, c.code_acces,
            s.nomstagiaire, s.prenomstagiaire
@@ -55,7 +54,7 @@ $active_page='resultats';
 <html lang="fr">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Résultats — AIR SECURE ANAC</title>
+<title>Résultats — EXASUR ANAC</title>
 <link rel="icon" href="../assets/images/faviconLOGOANAC.ico">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -71,6 +70,25 @@ $active_page='resultats';
 .pb{height:6px;border-radius:3px;background:#f0f0f0;width:72px;display:inline-block;vertical-align:middle;}
 .pf{height:100%;border-radius:3px;}
 .km{background:white;border-radius:11px;padding:14px 18px;box-shadow:0 2px 10px rgba(3,34,76,.07);flex:1;min-width:110px;border-left:3px solid transparent;}
+.badge-resultat {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 14px;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 0.78rem;
+}
+.badge-reussi {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #86efac;
+}
+.badge-echec {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+}
 </style>
 </head>
 <body>
@@ -96,15 +114,15 @@ $active_page='resultats';
   </div>
   <div class="km" style="border-left-color:#16a34a">
     <div style="font-size:1.6rem;font-weight:800;color:#16a34a;"><?= $ok ?></div>
-    <div style="font-size:.74rem;color:#9ca3af;font-weight:600;">RÉUSSIS</div>
+    <div style="font-size:.74rem;color:#9ca3af;font-weight:600;">RÉUSSIS (≥70%)</div>
   </div>
   <div class="km" style="border-left-color:#dc2626">
     <div style="font-size:1.6rem;font-weight:800;color:#dc2626;"><?= $ko ?></div>
-    <div style="font-size:.74rem;color:#9ca3af;font-weight:600;">ÉCHECS</div>
+    <div style="font-size:.74rem;color:#9ca3af;font-weight:600;">ÉCHECS (<70%)</div>
   </div>
   <div class="km" style="border-left-color:#7c3aed">
     <div style="font-size:1.6rem;font-weight:800;color:#7c3aed;"><?= $tx ?>%</div>
-    <div style="font-size:.74rem;color:#9ca3af;font-weight:600;">TAUX RÉUSSITE</div>
+    <div style="font-size:.74rem;color:#9ca3af;font-weight:600;">TAUX RÉUSSITE GLOBAL</div>
   </div>
 </div>
 
@@ -115,7 +133,6 @@ $active_page='resultats';
   </div>
   <div class="card-admin-body p-0">
     <div class="filter-bar" style="border-radius:0;box-shadow:none;border-bottom:1px solid var(--gray-border);flex-wrap:wrap;gap:8px;">
-      <!-- ① Candidat — liste déroulante code + nom (Select2 avec recherche) -->
       <div class="filter-group" style="min-width:220px;">
         <label><i class="fas fa-user me-1" style="color:var(--gold);"></i>Candidat</label>
         <select class="form-select-admin select2-cand" id="fCand" name="f_cand" onchange="submitFilter()">
@@ -127,12 +144,10 @@ $active_page='resultats';
           <?php endwhile; ?>
         </select>
       </div>
-      <!-- ② Recherche texte rapide (filtre JS local en complément) -->
       <div class="filter-group">
         <label><i class="fas fa-search me-1"></i>Recherche rapide</label>
         <input class="form-control-admin" id="srchR" placeholder="Nom, code..." value="<?= htmlspecialchars($_GET['f_search']??'') ?>">
       </div>
-      <!-- ③ Type examen -->
       <div class="filter-group" style="max-width:130px"><label>Type</label>
         <select class="form-select-admin" id="fType" onchange="filterR()">
           <option value="">Tous</option>
@@ -143,7 +158,6 @@ $active_page='resultats';
           <?php endforeach; ?>
         </select>
       </div>
-      <!-- ④ Résultat -->
       <div class="filter-group" style="max-width:120px"><label>Résultat</label>
         <select class="form-select-admin" id="fRes" onchange="filterR()">
           <option value="">Tous</option>
@@ -151,7 +165,6 @@ $active_page='resultats';
           <option value="0" <?= ($f_res===0)?'selected':'' ?>>❌ Échecs</option>
         </select>
       </div>
-      <!-- Bouton reset -->
       <div class="filter-group" style="align-self:flex-end;">
         <a href="resultats.php" class="btn-anac" style="background:#e8ecf5;color:var(--blue);border-color:#c8d0e0;font-size:.82rem;padding:7px 12px;text-decoration:none;">
           <i class="fas fa-times me-1"></i>Effacer
@@ -163,52 +176,21 @@ $active_page='resultats';
         <thead><tr><th>Candidat</th><th>Code</th><th>Type</th><th>Session</th><th>Note</th><th>Score</th><th>Résultat</th><th>Date</th><th>Actions</th></tr></thead>
         <tbody>
         <?php
-        /*
-         * SEUILS PAR EXAMEN (réglementation ANAC) :
-         *   IF théorie  : 70%    IF pratique : 80% (+ moyenne>=80%)
-         *   INST        : 80%    SENS : 70%   FORM : 70%   AS : 80%
-         */
-        $SEUILS = [
-            'IF'   => ['theorie'=>70.0, 'pratique'=>80.0, 'moy'=>80.0],
-            'INST' => ['theorie'=>80.0],
-            'SENS' => ['theorie'=>70.0],
-            'FORM' => ['theorie'=>70.0],
-            'AS'   => ['theorie'=>80.0],
-        ];
+        // RÈGLE UNIQUE : Score >= 70% → RÉUSSI, sinon ÉCHEC
         while($r=$resultats->fetch_assoc()):
-            $p       = round($r['pourcentage'],1);
-            $tc      = $r['tc'];
-            $ts      = $r['type_session'] ?? 'normal';
-
-            /* ── Seuil applicable à cette ligne ── */
-            if($tc==='IF' && $ts==='theorie')       $seuil_ligne = 70.0;
-            elseif($tc==='IF' && $ts==='pratique')  $seuil_ligne = 80.0;
-            else                                     $seuil_ligne = $SEUILS[$tc]['theorie'] ?? 80.0;
-
-            /* ── Couleur barre de progression ── */
-            $col = $p>=$seuil_ligne ? '#16a34a' : ($p>=($seuil_ligne*0.875) ? '#ca8a04' : '#dc2626');
-
-            /* ── Badge résultat : recalculer selon seuil correct ── */
-            if($tc==='IF' && $ts==='pratique') {
-                /* IF Pratique : reussite globale = reussite_prat>=80% ET théorie>=70% ET moyenne>=80% */
-                $reussite_prat_ok  = ($p >= 80.0);
-                $pct_theo_recup    = floatval($r['note_theorique'] > 0 ? ($r['note_theorique']/$r['note_sur'])*100 : 0);
-                /* Utiliser moyenne_if stockée en BDD si disponible */
-                $moy_if            = floatval($r['moyenne_if'] ?? 0);
-                $badge_reussi      = ($reussite_prat_ok && ($moy_if >= 80.0 || $r['reussite']==1));
-            } elseif($tc==='IF' && $ts==='theorie') {
-                $badge_reussi = ($p >= 70.0);
-            } else {
-                $badge_reussi = ($p >= $seuil_ligne);
-            }
+            $p = round($r['pourcentage'], 1);
+            $tc = $r['tc'];
+            $ts = $r['type_session'] ?? 'normal';
+            $reussi = ($p >= 70.0);
+            $col = $reussi ? '#16a34a' : '#dc2626';
         ?>
-        <tr data-type="<?= $tc ?>" data-res="<?= $badge_reussi?1:0 ?>"
+        <tr data-type="<?= $tc ?>" data-res="<?= $reussi?1:0 ?>"
             data-s="<?= strtolower($r['nomstagiaire'].' '.$r['prenomstagiaire'].' '.$r['code_acces']) ?>">
           <td><div style="font-weight:700;"><?= htmlspecialchars($r['nomstagiaire'].' '.$r['prenomstagiaire']) ?></div></td>
           <td><span style="background:var(--blue);color:white;padding:3px 10px;border-radius:50px;font-weight:700;font-size:.8rem;"><?= $r['code_acces'] ?></span></td>
           <td><span class="tp tp-<?= $tc ?>"><?= $tc ?></span>
-            <?php if($ts==='theorie'): ?><br><span style="font-size:.68rem;background:#dbeafe;color:#1e40af;padding:1px 7px;border-radius:20px;">📖 Th. — seuil <?= $seuil_ligne ?>%</span>
-            <?php elseif($ts==='pratique'): ?><br><span style="font-size:.68rem;background:#fce7f3;color:#9d174d;padding:1px 7px;border-radius:20px;">🖼️ Prat. — seuil <?= $seuil_ligne ?>%</span><?php endif; ?>
+            <?php if($ts==='theorie'): ?><br><span style="font-size:.68rem;background:#dbeafe;color:#1e40af;padding:1px 7px;border-radius:20px;">📖 Théorie</span>
+            <?php elseif($ts==='pratique'): ?><br><span style="font-size:.68rem;background:#fce7f3;color:#9d174d;padding:1px 7px;border-radius:20px;">🖼️ Pratique</span><?php endif; ?>
           </td>
           <td style="font-size:.82rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= htmlspecialchars($r['nom_session']) ?>
             <?php if($r['nom_module_fr']): ?><br><span style="font-size:.7rem;color:#9ca3af;">Mod.<?= $r['numero_module'] ?></span><?php endif; ?>
@@ -221,15 +203,19 @@ $active_page='resultats';
             </div>
             <?php if(!empty($r['moyenne_if'])): ?>
             <div style="font-size:.7rem;color:#6b7280;margin-top:2px;">
-              Moy.IF: <strong style="color:<?= $r['moyenne_if']>=80?'#16a34a':'#dc2626' ?>"><?= round($r['moyenne_if'],1) ?>%</strong>
+              Moy.IF: <strong style="color:<?= $r['moyenne_if']>=70?'#16a34a':'#dc2626' ?>"><?= round($r['moyenne_if'],1) ?>%</strong>
             </div>
             <?php endif; ?>
           </td>
           <td>
-            <?php if($badge_reussi): ?>
-              <span class="badge-status badge-en_cours"><i class="fas fa-check me-1"></i>Réussi</span>
+            <?php if($reussi): ?>
+              <span class="badge-resultat badge-reussi">
+                <i class="fas fa-check-circle"></i> RÉUSSI (<?= $p ?>%)
+              </span>
             <?php else: ?>
-              <span class="badge-status badge-annulee"><i class="fas fa-times me-1"></i>Échec</span>
+              <span class="badge-resultat badge-echec">
+                <i class="fas fa-times-circle"></i> ÉCHEC (<?= $p ?>%)
+              </span>
             <?php endif; ?>
             <?php if($r['locked']): ?><div style="font-size:.68rem;color:#dc2626;margin-top:3px;"><i class="fas fa-lock me-1"></i>Verrouillé</div><?php endif; ?>
             <?php if(!empty($r['reason'])): ?>
@@ -260,7 +246,6 @@ $active_page='resultats';
 <script>
 document.getElementById('st').addEventListener('click',()=>document.getElementById('adminSidebar').classList.toggle('open'));
 
-/* ── Select2 sur la liste déroulante candidats (recherche par code ou nom) ── */
 $('.select2-cand').select2({
     width:'100%',
     placeholder:'Code ou nom du candidat...',
@@ -268,7 +253,6 @@ $('.select2-cand').select2({
     language:{noResults:()=>'Aucun candidat trouvé'}
 });
 
-/* Soumettre le formulaire quand un candidat est sélectionné via Select2 */
 $('.select2-cand').on('change',function(){submitFilter();});
 
 function submitFilter(){
@@ -280,7 +264,6 @@ function submitFilter(){
     window.location.href=url.toString();
 }
 
-/* Filtre JS local (texte + type + résultat) — sans rechargement */
 function filterR(){
     const q=document.getElementById('srchR').value.toLowerCase();
     const t=document.getElementById('fType').value;
@@ -291,18 +274,15 @@ function filterR(){
         row.style.display=m?'':'none';
         if(m) vis++;
     });
-    /* Mettre à jour le badge */
     const badge=document.querySelector('.badge-count');
     if(badge) badge.textContent=vis;
 }
 
-/* Recherche texte en temps réel → filtre JS local */
 document.getElementById('srchR').addEventListener('input',filterR);
 document.getElementById('srchR').addEventListener('keypress',e=>{if(e.key==='Enter'){e.preventDefault();submitFilter();}});
 document.getElementById('fType').addEventListener('change',filterR);
 document.getElementById('fRes').addEventListener('change',filterR);
 
-/* Init : appliquer filtre JS si valeur présente */
 filterR();
 </script>
 </body></html>

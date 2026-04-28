@@ -2,6 +2,7 @@
 /**
  * dashboard.php — Tableau de bord EXASUR ANAC GABON
  * Filtres dynamiques (date exacte session), KPIs AJAX, rapports Select2
+ * SEUIL UNIQUE : 70% pour TOUS les examens
  */
 session_start();
 if (!isset($_SESSION['admin_id'])) { header("Location: login.php"); exit(); }
@@ -18,15 +19,12 @@ if (isset($_GET['ajax']) && $_GET['ajax']==='kpi') {
     $hasFilter = ($f_deb || $f_fin || $f_ann || $f_type);
 
     /* ── Conditions sur session_examen ── */
-    /* On construit une liste de conditions (sans WHERE) */
     $cse = ["1=1"];
-    if ($f_deb)  $cse[] = "se.date_debut = '$f_deb'";   /* égalité exacte */
-    if ($f_fin)  $cse[] = "se.date_fin   = '$f_fin'";   /* égalité exacte */
+    if ($f_deb)  $cse[] = "se.date_debut = '$f_deb'";
+    if ($f_fin)  $cse[] = "se.date_fin   = '$f_fin'";
     if ($f_ann)  $cse[] = "YEAR(se.date_debut) = $f_ann";
     if ($f_type) $cse[] = "se.idtype_examen = $f_type";
     $where_se = "WHERE " . implode(" AND ", $cse);
-
-    /* IDs de sessions filtrées (sous-requête réutilisable) */
     $sub_ids = "SELECT id_session FROM session_examen se $where_se";
 
     /* ── Conditions sur resultats ── */
@@ -48,9 +46,8 @@ if (isset($_GET['ajax']) && $_GET['ajax']==='kpi') {
     $nb_questions  = intval($conn->query("SELECT COUNT(*) FROM question")->fetch_row()[0]);
     $nb_evals      = intval($conn->query("SELECT COUNT(*) FROM evaluations")->fetch_row()[0]);
 
-    /* ── Stats par type ── */
-    /* Conditions sur session_examen pour le JOIN (sans le préfixe WHERE) */
-    $cse_join = implode(" AND ", $cse); /* ex: 1=1 AND se.date_debut='...' */
+    /* ── Stats par type (seuil 70% pour tous) ── */
+    $cse_join = implode(" AND ", $cse);
     $types_q = $conn->query("
         SELECT te.code, te.nom_fr,
                COUNT(DISTINCT cs.idcandidat)                              AS nb_cand,
@@ -168,14 +165,12 @@ $active_page='dashboard';
 <link rel="stylesheet" href="admin_shared.css">
 <style>
 :root{--blue:#03224c;--gold:#D4AF37;--blue-mid:#0a3a6b;}
-/* ── Bannière ── */
-.banner{background:linear-gradient(135deg,var(--blue),var(--blue-mid));color:white;border-radius:14px;padding:18px 24px;margin-bottom:22px;border-bottom:4px solid var(--gold);display:flex;align-items:center;gap:16px;}
+.banner{background:linear-gradient(135deg,var(--blue),var(--blue-mid));color:white;border-radius:14px;padding:18px 24px;margin-bottom:22px;border-bottom:4px solid var(--gold);display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
 .banner img{height:52px;background:white;padding:6px;border-radius:10px;flex-shrink:0;}
 .banner h1{font-size:1.1rem;font-weight:800;margin-bottom:2px;}
 .banner p{font-size:.82rem;opacity:.8;margin:0;}
 .banner-taux{font-size:2.2rem;font-weight:800;color:var(--gold);text-align:center;white-space:nowrap;}
 .banner-taux-lbl{font-size:.72rem;opacity:.78;text-align:center;}
-/* ── Barre de filtres ── */
 .filter-dash{
     background:white;border-radius:14px;padding:14px 18px;margin-bottom:20px;
     box-shadow:0 2px 14px rgba(3,34,76,.08);border:1.5px solid #e0e7f0;
@@ -192,9 +187,7 @@ $active_page='dashboard';
 .btn-filter:hover{opacity:.9;}
 .btn-reset{background:#f0f4fa;color:var(--blue);border:1px solid #d1dbe8;border-radius:9px;padding:9px 12px;font-family:inherit;font-weight:700;font-size:.83rem;cursor:pointer;}
 .btn-reset:hover{background:#e2e8f5;}
-/* Indicateur filtre actif */
 .filter-active-badge{display:inline-flex;align-items:center;gap:5px;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:50px;padding:3px 10px;font-size:.73rem;font-weight:700;margin-left:6px;}
-/* ── KPIs ── */
 .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;margin-bottom:22px;}
 .kpi{background:white;border-radius:13px;padding:16px 18px;box-shadow:0 3px 14px rgba(3,34,76,.08);display:flex;align-items:center;gap:13px;border-left:4px solid transparent;transition:transform .2s,box-shadow .2s;text-decoration:none;color:inherit;cursor:pointer;}
 .kpi:hover{transform:translateY(-3px);box-shadow:0 6px 22px rgba(3,34,76,.13);}
@@ -202,14 +195,12 @@ $active_page='dashboard';
 .kpi-val{font-size:1.8rem;font-weight:800;line-height:1;transition:all .3s;}
 .kpi-lbl{font-size:.7rem;font-weight:600;color:#6c7a8d;text-transform:uppercase;letter-spacing:.3px;margin-top:2px;}
 .kpi.updating{opacity:.5;}
-/* ── Types progress ── */
 .tp-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed #e5e7eb;}
 .tp-row:last-child{border-bottom:none;}
 .tp{display:inline-flex;padding:3px 9px;border-radius:50px;font-size:.72rem;font-weight:700;}
 .tp-AS{background:#dbeafe;color:#1e40af;}.tp-IF{background:#d1fae5;color:#065f46;}
 .tp-INST{background:#fef3c7;color:#92400e;}.tp-SENS{background:#ede9fe;color:#5b21b6;}
 .tp-FORM{background:#fce7f3;color:#9d174d;}
-/* ── Rapport cards ── */
 .report-card{background:white;border-radius:14px;padding:20px;box-shadow:0 2px 14px rgba(3,34,76,.07);border-top:4px solid var(--gold);height:100%;transition:transform .2s,box-shadow .2s;}
 .report-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(3,34,76,.12);}
 .report-card h5{color:var(--blue);font-weight:700;margin-bottom:5px;font-size:.95rem;}
@@ -217,23 +208,18 @@ $active_page='dashboard';
 .report-card p{font-size:.8rem;color:#6b7280;margin-bottom:12px;}
 .report-card.blue-top{border-top-color:var(--blue);}
 .report-card.green-top{border-top-color:#16a34a;}
-/* ── Loader overlay ── */
 .dash-loader{display:none;position:fixed;inset:0;background:rgba(3,34,76,.12);z-index:9999;align-items:center;justify-content:center;}
 .dash-loader.show{display:flex;}
 .dash-spinner{width:50px;height:50px;border:4px solid #e0e7f0;border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
-/* Badge sessions */
 .sess-badge{display:inline-flex;padding:2px 8px;border-radius:50px;font-size:.7rem;font-weight:700;background:#f0f3f9;color:#374151;}
 .sess-planifiee{background:#dbeafe;color:#1e40af;}
 .sess-en_cours{background:#dcfce7;color:#16a34a;}
 .sess-terminee{background:#f3f4f6;color:#6b7280;}
 .sess-annulee{background:#fee2e2;color:#dc2626;}
-/* Taux barre */
 .taux-bar{height:8px;border-radius:4px;background:#e5e7eb;overflow:hidden;margin:4px 0;}
 .taux-bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--gold),var(--blue));transition:width .6s ease;}
-/* Timestamp */
 .last-update{font-size:.72rem;color:#9ca3af;font-style:italic;}
-/* Bouton imprimer dans tableau */
 .btn-print-row{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;
     background:#f0f3f9;color:var(--blue);border-radius:6px;text-decoration:none;
     font-size:.82rem;transition:background .2s,color .2s;border:1px solid #e0e7f0;}
@@ -241,7 +227,7 @@ $active_page='dashboard';
 </style>
 </head>
 <body>
-<!-- Loader -->
+
 <div class="dash-loader" id="dashLoader"><div class="dash-spinner"></div></div>
 
 <div class="admin-layout">
@@ -257,7 +243,7 @@ $active_page='dashboard';
         <?php if($stats['online']>0): ?>
         <span style="background:#dcfce7;color:#166534;padding:3px 11px;border-radius:50px;font-size:.76rem;font-weight:700;"><i class="fas fa-circle fa-xs me-1"></i><?= $stats['online'] ?> en ligne</span>
         <?php endif; ?>
-        <span style="font-weight:600;font-size:.85rem"><?= htmlspecialchars($_SESSION['admin_nom']) ?></span>
+        <span style="font-weight:600;font-size:.85rem"><?= htmlspecialchars($_SESSION['admin_nom'] ?? '') ?></span>
     </div>
 </div>
 
@@ -267,16 +253,16 @@ $active_page='dashboard';
 <div class="banner">
     <img src="../assets/images/Logo-ANAC-CERTIFICATION.png" alt="ANAC" onerror="this.style.display='none'">
     <div>
-        <h1>AIR SECURE — Administration ANAC GABON</h1>
+        <h1>EXASUR — Administration ANAC GABON</h1>
         <p>Plateforme de gestion des examens de certification AVSEC-FAL — Aviation Civile du Gabon</p>
     </div>
     <div class="ms-auto text-center">
         <div class="banner-taux" id="banTaux"><?= $taux_global ?>%</div>
-        <div class="banner-taux-lbl">Taux de réussite global</div>
+        <div class="banner-taux-lbl">Taux de réussite global (≥70%)</div>
     </div>
 </div>
 
-<!-- ══ BARRE DE FILTRES — Power BI style ══ -->
+<!-- ══ BARRE DE FILTRES ══ -->
 <div class="filter-dash">
     <div style="display:flex;align-items:center;gap:8px;margin-right:6px;">
         <div style="width:32px;height:32px;background:var(--blue);color:var(--gold);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
@@ -320,7 +306,7 @@ $active_page='dashboard';
     <div style="align-self:flex-end;font-size:.72rem;color:#9ca3af;white-space:nowrap;">
         <i class="fas fa-info-circle me-1" style="color:var(--gold);"></i>
         Dates filtrées <strong>exactement</strong><br>
-        (20/04→24/04 ≠ 20/04→23/04)
+        Seuil de validation : <strong>70%</strong> pour tous les examens
     </div>
 </div>
 
@@ -332,8 +318,8 @@ $active_page='dashboard';
         ['sessions.php','fa-calendar-alt','#d97706','#fef3c7',$stats['sessions'],'Total sessions','kv-sessions'],
         ['sessions.php','fa-play-circle','#16a34a','#dcfce7',$stats['en_cours'],'Sessions en cours','kv-encours'],
         ['resultats.php','fa-chart-bar','#7c3aed','#ede9fe',$stats['resultats'],'Examens passés','kv-exams'],
-        ['resultats.php','fa-trophy','#b45309','#fef3c7',$stats['reussites'],'Candidats reçus','kv-reussis'],
-        ['resultats.php','fa-times-circle','#dc2626','#fee2e2',$stats['echecs'],'Échecs','kv-echecs'],
+        ['resultats.php','fa-trophy','#b45309','#fef3c7',$stats['reussites'],'Candidats reçus (≥70%)','kv-reussis'],
+        ['resultats.php','fa-times-circle','#dc2626','#fee2e2',$stats['echecs'],'Échecs (<70%)','kv-echecs'],
         ['questions.php','fa-question-circle','#0891b2','#cffafe',$stats['questions'],'Questions banque','kv-questions'],
         ['evaluations.php','fa-star','#0891b2','#e0f2fe',$stats['evaluations'],'Évaluations','kv-eval'],
     ];
@@ -366,7 +352,7 @@ $active_page='dashboard';
         <div class="card-admin h-100">
             <div class="card-admin-header">
                 <i class="fas fa-users me-2" style="color:var(--gold)"></i>
-                <h5>Répartition par type</h5>
+                <h5>Répartition par type (seuil 70%)</h5>
             </div>
             <div class="card-admin-body" id="typeStatsContainer">
                 <?php
@@ -374,13 +360,15 @@ $active_page='dashboard';
                 foreach($type_stats as $i=>$t):
                     $pct=$stats['candidats']>0?round($t['nb_cand']/$stats['candidats']*100):0;
                     $col=$colors[$i%count($colors)];
-                    $tx=$t['nb_exam']>0?round($t['nb_ok']/$t['nb_exam']*100):0;?>
+                    $tx=$t['nb_exam']>0?round($t['nb_ok']/$t['nb_exam']*100):0;
+                    $tx_color = $tx >= 70 ? '#16a34a' : ($tx >= 50 ? '#d97706' : '#dc2626');
+                ?>
                 <div class="tp-row">
                     <span class="tp tp-<?= $t['code'] ?>"><?= $t['code'] ?></span>
                     <div style="flex:1">
                         <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
                             <span style="font-size:.82rem;font-weight:600"><?= htmlspecialchars($t['nom_fr']) ?></span>
-                            <span style="font-size:.8rem;color:#6b7280;"><?= $t['nb_cand'] ?> · <span style="color:<?= $tx>=70?'#16a34a':'#dc2626' ?>;font-weight:700;"><?= $tx ?>%</span></span>
+                            <span style="font-size:.8rem;color:#6b7280;"><?= $t['nb_cand'] ?> · <span style="color:<?= $tx_color ?>;font-weight:700;"><?= $tx ?>%</span></span>
                         </div>
                         <div class="taux-bar"><div class="taux-bar-fill" style="width:<?= $tx ?>%"></div></div>
                     </div>
@@ -420,7 +408,7 @@ $active_page='dashboard';
     <div class="col-md-3">
         <div class="report-card">
             <h5><i class="fas fa-calendar-check me-2"></i>Rapport de session</h5>
-            <p>Classement par mérite de tous les candidats d'une session.</p>
+            <p>Classement par mérite de tous les candidats d'une session (seuil 70%).</p>
             <label class="form-label-admin">Sélectionner la session</label>
             <select id="rpt_session" class="form-select-admin s2rpt" style="margin-bottom:12px;width:100%;">
                 <option value="">-- Rechercher une session --</option>
@@ -436,7 +424,7 @@ $active_page='dashboard';
     <div class="col-md-3">
         <div class="report-card blue-top">
             <h5><i class="fas fa-building me-2"></i>Rapport par entité</h5>
-            <p>Résultats de tous les candidats d'un organisme.</p>
+            <p>Résultats de tous les candidats d'un organisme (seuil 70%).</p>
             <label class="form-label-admin">Sélectionner l'organisme</label>
             <select id="rpt_orga" class="form-select-admin s2rpt" style="margin-bottom:12px;width:100%;">
                 <option value="">-- Rechercher un organisme --</option>
@@ -474,7 +462,7 @@ $active_page='dashboard';
         <div class="card-admin">
             <div class="card-admin-header">
                 <i class="fas fa-history me-2" style="color:var(--gold)"></i>
-                <h5>Derniers résultats</h5>
+                <h5>Derniers résultats (seuil 70%)</h5>
                 <a href="resultats.php" class="ms-auto" style="color:var(--gold);font-size:.8rem;text-decoration:none;font-weight:600;">Voir tous <i class="fas fa-arrow-right ms-1"></i></a>
             </div>
             <div class="table-responsive" id="derniersContainer">
@@ -488,23 +476,19 @@ $active_page='dashboard';
                             <th>%</th>
                             <th>Résultat</th>
                             <th>Date</th>
-                            <!-- ① AJOUT : colonne imprimer -->
-                            <th style="width:36px;text-align:center;" title="Imprimer relevé">
-                                <i class="fas fa-print" style="color:var(--gold);font-size:.8rem;"></i>
-                            </th>
+                            <th style="width:36px;text-align:center;" title="Imprimer relevé"><i class="fas fa-print" style="color:var(--gold);font-size:.8rem;"></i></th>
                         </tr>
                     </thead>
                     <tbody id="bodyDerniers">
-                    <?php while($r=$derniers_res->fetch_assoc()):$p=round($r['pourcentage'],1);?>
+                    <?php while($r=$derniers_res->fetch_assoc()):$p=round($r['pourcentage'],1);$reussi=$p>=70;?>
                     <tr>
                         <td style="font-weight:600"><?= htmlspecialchars($r['nomstagiaire'].' '.$r['prenomstagiaire']) ?></td>
                         <td><span class="tp tp-<?= $r['tc'] ?>"><?= $r['tc'] ?></span></td>
                         <td style="font-size:.82rem;color:#6b7280;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= htmlspecialchars($r['nom_session']) ?></td>
                         <td style="font-weight:700;color:var(--blue)"><?= round($r['note_finale'],1).'/'.round($r['note_sur'],1) ?>pts</td>
-                        <td style="color:<?= $p>=80?'#16a34a':($p>=70?'#ca8a04':'#dc2626') ?>;font-weight:700"><?= $p ?>%</td>
-                        <td><?= $r['reussite']?'<span class="badge-status badge-en_cours"><i class="fas fa-check me-1"></i>Réussi</span>':'<span class="badge-status badge-annulee"><i class="fas fa-times me-1"></i>Échec</span>' ?></td>
+                        <td style="color:<?= $reussi?'#16a34a':'#dc2626' ?>;font-weight:700"><?= $p ?>%</td>
+                        <td><?= $reussi?'<span class="badge-status badge-en_cours"><i class="fas fa-check me-1"></i>Réussi</span>':'<span class="badge-status badge-annulee"><i class="fas fa-times me-1"></i>Échec</span>' ?></td>
                         <td style="color:#6b7280;font-size:.8rem"><?= date('d/m/Y H:i',strtotime($r['date_fin'])) ?></td>
-                        <!-- ② AJOUT : bouton imprimer par ligne -->
                         <td style="text-align:center;">
                             <a href="print_candidat.php?id=<?= $r['idcandidat'] ?>&session=<?= $r['id_session'] ?>"
                                target="_blank"
@@ -524,7 +508,7 @@ $active_page='dashboard';
         <div class="card-admin h-100">
             <div class="card-admin-header">
                 <i class="fas fa-calendar me-2" style="color:var(--gold)"></i>
-                <h5>Sessions</h5>
+                <h5>Sessions récentes</h5>
                 <a href="sessions.php" class="ms-auto" style="color:var(--gold);font-size:.8rem;text-decoration:none;font-weight:600;">Gérer →</a>
             </div>
             <div class="card-admin-body p-0" id="sessContainer">
@@ -554,7 +538,7 @@ $active_page='dashboard';
 <script>
 document.getElementById('sidebarToggle').addEventListener('click',()=>document.getElementById('adminSidebar').classList.toggle('open'));
 
-/* ── Select2 sur les rapports (avec recherche tapable) ── */
+/* ── Select2 sur les rapports ── */
 $(document).ready(function(){
     $('.s2rpt').select2({width:'100%',placeholder:'Rechercher...',allowClear:true,language:{noResults:()=>'Aucun résultat'}});
     $('#rpt_orga').on('change',function(){
@@ -571,8 +555,8 @@ let myChart=new Chart(chartCtx,{
     data:{
         labels:<?= json_encode($graph_labels) ?>,
         datasets:[
-            {label:'Réussis',data:<?= json_encode($graph_ok) ?>,backgroundColor:'rgba(22,163,74,.75)',borderRadius:6},
-            {label:'Échecs', data:<?= json_encode($graph_ko) ?>,backgroundColor:'rgba(220,38,38,.65)',borderRadius:6}
+            {label:'Réussis (≥70%)',data:<?= json_encode($graph_ok) ?>,backgroundColor:'rgba(22,163,74,.75)',borderRadius:6},
+            {label:'Échecs (<70%)', data:<?= json_encode($graph_ko) ?>,backgroundColor:'rgba(220,38,38,.65)',borderRadius:6}
         ]
     },
     options:{responsive:true,plugins:{legend:{position:'top'}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'rgba(0,0,0,.05)'}}}}
@@ -588,18 +572,16 @@ function refreshDash(){
     const ann=document.getElementById('fAnn').value;
     const type=document.getElementById('fType').value;
 
-    /* Badge filtre actif */
     const hasFilter=deb||fin||ann||type;
     document.getElementById('filterBadge').style.display=hasFilter?'':'none';
-
     document.getElementById('dashLoader').classList.add('show');
 
     $.getJSON('dashboard.php',{ajax:'kpi',f_deb:deb,f_fin:fin,f_ann:ann,f_type:type},function(d){
         document.getElementById('dashLoader').classList.remove('show');
-        if(!d){return;}
+        if(!d) return;
         const k=d.kpi;
 
-        /* KPIs — animation compteur sur tous */
+        /* KPIs animation */
         animCount('kv-candidats', k.candidats);
         animCount('kv-sessions',  k.sessions);
         animCount('kv-encours',   k.en_cours);
@@ -609,7 +591,6 @@ function refreshDash(){
         animCount('kv-questions', k.questions);
         animCount('kv-eval',      k.evals);
 
-        /* Taux bannière */
         document.getElementById('banTaux').textContent=k.taux+'%';
 
         /* Graphique */
@@ -621,7 +602,6 @@ function refreshDash(){
         myChart.data.datasets[1].data=ko;
         myChart.update('active');
 
-        /* Note graphique */
         document.getElementById('graphNote').textContent=hasFilter?'(filtré)':'';
 
         /* Stats types */
@@ -629,13 +609,13 @@ function refreshDash(){
         let html='';
         d.type_stats.forEach((t,i)=>{
             const tx=t.nb_exam>0?Math.round(t.nb_ok/t.nb_exam*100):0;
-            const col=colors[i%colors.length];
+            const tx_color = tx >= 70 ? '#16a34a' : (tx >= 50 ? '#d97706' : '#dc2626');
             html+=`<div class="tp-row">
                 <span class="tp tp-${t.code}">${t.code}</span>
                 <div style="flex:1">
                     <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
                         <span style="font-size:.82rem;font-weight:600">${esc(t.nom_fr)}</span>
-                        <span style="font-size:.8rem;color:#6b7280;">${t.nb_cand} · <span style="color:${tx>=70?'#16a34a':'#dc2626'};font-weight:700;">${tx}%</span></span>
+                        <span style="font-size:.8rem;color:#6b7280;">${t.nb_cand} · <span style="color:${tx_color};font-weight:700;">${tx}%</span></span>
                     </div>
                     <div class="taux-bar"><div class="taux-bar-fill" style="width:${tx}%"></div></div>
                 </div>
@@ -643,49 +623,52 @@ function refreshDash(){
         });
         document.getElementById('typeStatsContainer').innerHTML=html;
 
-        /* Derniers résultats — avec bouton imprimer (colspan 8) */
+        /* Derniers résultats */
         let rows='';
-        d.derniers.forEach(r=>{
-            const p=Math.round(parseFloat(r.pourcentage)*10)/10;
-            const c=p>=80?'#16a34a':p>=70?'#ca8a04':'#dc2626';
-            const nom=esc(r.nomstagiaire+' '+r.prenomstagiaire);
-            rows+=`<tr>
-                <td style="font-weight:600">${nom}</td>
-                <td><span class="tp tp-${r.tc}">${r.tc}</span></td>
-                <td style="font-size:.82rem;color:#6b7280;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.nom_session)}</td>
-                <td style="font-weight:700;color:var(--blue)">${Math.round(parseFloat(r.note_finale)*10)/10}/${Math.round(parseFloat(r.note_sur)*10)/10}pts</td>
-                <td style="color:${c};font-weight:700">${p}%</td>
-                <td>${parseInt(r.reussite)?'<span class="badge-status badge-en_cours"><i class="fas fa-check me-1"></i>Réussi</span>':'<span class="badge-status badge-annulee"><i class="fas fa-times me-1"></i>Échec</span>'}</td>
-                <td style="color:#6b7280;font-size:.8rem">${fmtDt(r.date_fin)}</td>
-                <td style="text-align:center;">
-                    <a href="print_candidat.php?id=${r.idcandidat}&session=${r.id_session}"
-                       target="_blank" title="Imprimer relevé de ${nom}"
-                       class="btn-print-row">
-                        <i class="fas fa-print"></i>
-                    </a>
-                </td>
-            </tr>`;
-        });
-        if(!rows)rows='<tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:20px;">Aucun résultat pour ces filtres</td></tr>';
+        if(d.derniers && d.derniers.length){
+            d.derniers.forEach(r=>{
+                const p=Math.round(parseFloat(r.pourcentage)*10)/10;
+                const reussi = p >= 70;
+                const nom=esc(r.nomstagiaire+' '+r.prenomstagiaire);
+                rows+=`<tr>
+                    <td style="font-weight:600">${nom}</td>
+                    <td><span class="tp tp-${r.tc}">${r.tc}</span></td>
+                    <td style="font-size:.82rem;color:#6b7280;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.nom_session)}</td>
+                    <td style="font-weight:700;color:var(--blue)">${Math.round(parseFloat(r.note_finale)*10)/10}/${Math.round(parseFloat(r.note_sur)*10)/10}pts</td>
+                    <td style="color:${reussi?'#16a34a':'#dc2626'};font-weight:700">${p}%</td>
+                    <td>${reussi?'<span class="badge-status badge-en_cours"><i class="fas fa-check me-1"></i>Réussi</span>':'<span class="badge-status badge-annulee"><i class="fas fa-times me-1"></i>Échec</span>'}</td>
+                    <td style="color:#6b7280;font-size:.8rem">${fmtDt(r.date_fin)}</td>
+                    <td style="text-align:center;">
+                        <a href="print_candidat.php?id=${r.idcandidat}&session=${r.id_session}"
+                           target="_blank" title="Imprimer relevé de ${nom}"
+                           class="btn-print-row">
+                            <i class="fas fa-print"></i>
+                        </a>
+                    </td>
+                </tr>`;
+            });
+        }
+        if(!rows) rows='<tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:20px;">Aucun résultat pour ces filtres</td></tr>';
         document.getElementById('bodyDerniers').innerHTML=rows;
 
         /* Sessions */
         let shtml='';
-        d.sessions.forEach(s=>{
-            shtml+=`<div style="padding:10px 15px;border-bottom:1px solid #f3f4f6;">
-                <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
-                    <span class="tp tp-${s.tc}">${s.tc}</span>
-                    <span class="sess-badge sess-${s.statut}">${s.statut}</span>
-                    <span style="font-size:.7rem;color:#9ca3af;margin-left:auto;">${s.nb} cand.</span>
-                </div>
-                <div style="font-size:.84rem;font-weight:600;color:var(--blue);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(s.nom_session)}</div>
-                <div style="font-size:.74rem;color:#9ca3af;">${fmtDate(s.date_debut)} → ${fmtDate(s.date_fin)}</div>
-            </div>`;
-        });
-        if(!shtml)shtml='<div style="text-align:center;color:#9ca3af;padding:20px;font-size:.83rem;">Aucune session</div>';
+        if(d.sessions && d.sessions.length){
+            d.sessions.forEach(s=>{
+                shtml+=`<div style="padding:10px 15px;border-bottom:1px solid #f3f4f6;">
+                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+                        <span class="tp tp-${s.tc}">${s.tc}</span>
+                        <span class="sess-badge sess-${s.statut}">${s.statut}</span>
+                        <span style="font-size:.7rem;color:#9ca3af;margin-left:auto;">${s.nb} cand.</span>
+                    </div>
+                    <div style="font-size:.84rem;font-weight:600;color:var(--blue);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(s.nom_session)}</div>
+                    <div style="font-size:.74rem;color:#9ca3af;">${fmtDate(s.date_debut)} → ${fmtDate(s.date_fin)}</div>
+                </div>`;
+            });
+        }
+        if(!shtml) shtml='<div style="text-align:center;color:#9ca3af;padding:20px;font-size:.83rem;">Aucune session</div>';
         document.getElementById('sessContainer').innerHTML=shtml;
 
-        /* Timestamp */
         const now=new Date();
         document.getElementById('lastUpdate').innerHTML='<i class="fas fa-sync-alt me-1"></i>Mis à jour à '+now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
     }).fail(()=>{document.getElementById('dashLoader').classList.remove('show');});
@@ -698,12 +681,11 @@ function resetFilters(){
     refreshDash();
 }
 
-/* Compteur animé */
 function animCount(id,val){
-    if(val===null)return;
-    const el=document.getElementById(id);if(!el)return;
+    if(val===null) return;
+    const el=document.getElementById(id);if(!el) return;
     const start=parseInt(el.textContent)||0;const end=parseInt(val)||0;
-    if(start===end)return;
+    if(start===end) return;
     const dur=400;const step=Math.ceil(Math.abs(end-start)/(dur/16));
     let cur=start;
     const iv=setInterval(()=>{
@@ -713,7 +695,6 @@ function animCount(id,val){
     },16);
 }
 
-/* Impression rapports */
 function printRpt(type){
     const map={
         'candidat':['rpt_candidat','print_candidat.php?id=','Veuillez choisir un candidat.'],
@@ -727,10 +708,10 @@ function printRpt(type){
     window.open(url+(val||''),'_blank','width=1200,height=860');
 }
 
-/* Helpers */
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
-function fmtDate(d){if(!d)return'';const p=d.substring(0,10).split('-');return p[2]+'/'+p[1]+'/'+p[0];}
-function fmtDt(d){if(!d)return'';const dt=new Date(d);return dt.toLocaleDateString('fr-FR')+' '+dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');}
+function fmtDate(d){if(!d) return'';const p=d.substring(0,10).split('-');return p[2]+'/'+p[1]+'/'+p[0];}
+function fmtDt(d){if(!d) return'';const dt=new Date(d);return dt.toLocaleDateString('fr-FR')+' '+dt.getHours().toString().padStart(2,'0')+':'+dt.getMinutes().toString().padStart(2,'0');}
 </script>
-</body></html>
+</body>
+</html>
 <?php $conn->close(); ?>

@@ -7,6 +7,8 @@
  *  - Titre renommé EXASUR
  *  - Retrait référence PNSAC dans le bloc alerte
  *  - Code accès 4 chiffres mentionné
+ *  - Seuil affiché : 70% pour AS (type1), IF (type2), INST (type3)
+ *  - Durée : IF Théorie 1h30, IF Pratique 1h, AS/INST 1h30
  */
 session_start();
 include '../php/db_connection.php';
@@ -30,9 +32,15 @@ $nom_type           = $type_info['nom_fr'];
 $code_type          = $type_info['code'];
 $nb_questions_theo  = intval($type_info['nb_questions_theorique'] ?? 0);
 $nb_questions_pra   = intval($type_info['nb_questions_pratique']  ?? 0);
-$seuil              = $type_info['seuil_reussite'];
+$seuil_bd           = $type_info['seuil_reussite'];
 $a_deux_parties     = $type_info['a_deux_parties'];
 $duree_minutes      = intval($type_info['duree_minutes'] ?? 90);
+
+/* ── Forcer l'affichage du seuil à 70% pour AS (1), IF (2), INST (3) ── */
+$seuil_affiche = $seuil_bd;
+if (in_array($type_personnel, [1, 2, 3])) {
+    $seuil_affiche = 70;
+}
 
 /* ── Formatage de la durée ────────────────────────────────────── */
 function formatDuree($minutes) {
@@ -44,13 +52,13 @@ function formatDuree($minutes) {
     return $minutes . ' minutes';
 }
 
-/* ── Texte "contient" selon type ──────────────────────────────── */
+/* ── Texte "contient" selon type avec durées correctes ──────────────── */
 if ($a_deux_parties && $code_type === 'IF') {
-    // IF : théorie + pratique
+    // IF : théorie 1h30 + pratique 1h
     $nb_theo_txt = $nb_questions_theo > 0 ? $nb_questions_theo : '50';
     $nb_pra_txt  = $nb_questions_pra  > 0 ? $nb_questions_pra  : '50';
-    $contenu_txt = "<strong>Théorie : {$nb_theo_txt} questions (seuil ≥ 70%) + Pratique : {$nb_pra_txt} questions images radiologiques</strong>";
-    $duree_txt   = '<strong>2 heures (1h théorie + 1h pratique) avec une pause de 15 minutes</strong>';
+    $contenu_txt = "<strong>Théorie : {$nb_theo_txt} questions (1h30, seuil ≥ 70%) + Pratique : {$nb_pra_txt} questions images radiologiques (1h, seuil cumulé 80%)</strong>";
+    $duree_txt   = '<strong>2h30 (1h30 théorie + 1h pratique) avec une pause de 15 minutes</strong>';
 } elseif ($a_deux_parties) {
     // Autre examen en deux parties
     $nb_theo_txt = $nb_questions_theo > 0 ? $nb_questions_theo : 'variable';
@@ -59,16 +67,20 @@ if ($a_deux_parties && $code_type === 'IF') {
     $duree_txt   = '<strong>' . formatDuree($duree_minutes) . '</strong>';
 } else {
     // Examen simple : théorique uniquement
-    // Si nb_questions_theorique est 0 dans la BDD, on affiche un texte générique clair
     if ($nb_questions_theo > 0) {
         $nb_txt = $nb_questions_theo;
     } else {
         // Valeurs par défaut par code si la BDD est vide
-        $defaults = ['AS'=>50,'INST'=>50,'SENS'=>20,'FORM'=>'variable'];
+        $defaults = ['AS'=>50, 'INST'=>50, 'SENS'=>20, 'FORM'=>'variable'];
         $nb_txt = $defaults[$code_type] ?? 'un nombre défini de';
     }
     $contenu_txt = "<strong>{$nb_txt} " . __('questions_choix_unique') . "</strong>";
-    $duree_txt   = '<strong>' . formatDuree($duree_minutes) . '</strong>';
+    // Durée spécifique selon le type
+    if (in_array($type_personnel, [1, 3])) {
+        $duree_txt = '<strong>1h30</strong>';
+    } else {
+        $duree_txt = '<strong>' . formatDuree($duree_minutes) . '</strong>';
+    }
 }
 
 /* ── Vérifier s'il y a des sessions disponibles ──────────────── */
@@ -292,6 +304,7 @@ $aucune_session = ($row_check['total'] == 0);
     <!-- Badge catégorie -->
     <div style="text-align:center;">
         <span class="badge-cat"><?php echo htmlspecialchars($code_type); ?></span>
+        <div class="badge-cat-name"><?php echo htmlspecialchars($nom_type); ?></div>
     </div>
 
     <!-- Carte principale -->
@@ -301,9 +314,6 @@ $aucune_session = ($row_check['total'] == 0);
                 <?php echo __('consignes_generales'); ?>
             </h2>
             <p><?php echo __('lisez_attentivement'); ?></p>
-            <div style="margin-top:10px;font-size:1.05rem;font-weight:700;color:var(--anac-gold);">
-                <?php echo htmlspecialchars($nom_type); ?>
-            </div>
         </div>
 
         <div class="card-body">
@@ -404,7 +414,10 @@ $aucune_session = ($row_check['total'] == 0);
                         <i class="fas fa-check-circle"></i>
                         <span>
                             <?php echo __('seuil_reussite'); ?> :
-                            <strong style="color:#D4AF37;font-size:1.1rem;"><?php echo $seuil; ?>%</strong>
+                            <strong style="color:#D4AF37;font-size:1.1rem;"><?php echo $seuil_affiche; ?>%</strong>
+                            <?php if ($code_type === 'IF'): ?>
+                            <span style="font-size:0.75rem;">(cumulé théorie+pratique 80%)</span>
+                            <?php endif; ?>
                         </span>
                     </li>
                     <li>
@@ -428,8 +441,16 @@ $aucune_session = ($row_check['total'] == 0);
                     <p style="margin-top:8px;color:#856404;font-weight:600;">
                         <i class="fas fa-exclamation-triangle" style="color:#D4AF37;margin-right:6px;"></i>
                         <?php echo ($_SESSION['lang']=='fr')
-                            ? 'Examen IF : vous commencerez par la théorie. Si votre note théorique est ≥ 70%, vous pourrez passer la partie pratique après une pause de 15 minutes. La note finale = moyenne théorie + pratique (seuil global 80%).'
-                            : 'IF Exam: you will start with the theory part. If your theory score is ≥ 70%, you can take the practical part after a 15-minute break. Final score = average of theory + practical (overall threshold 80%).'; ?>
+                            ? 'Examen IF : vous commencerez par la théorie (1h30, seuil 70%). Si votre note théorique est ≥ 70%, vous pourrez passer la partie pratique (1h) après une pause de 15 minutes. La note finale = moyenne théorie + pratique (seuil global 80%).'
+                            : 'IF Exam: you will start with the theory part (1h30, 70% threshold). If your theory score is ≥ 70%, you can take the practical part (1h) after a 15-minute break. Final score = average of theory + practical (overall threshold 80%).'; ?>
+                    </p>
+                    <?php endif; ?>
+                    <?php if (in_array($type_personnel, [1, 3]) && !$a_deux_parties): ?>
+                    <p style="margin-top:8px;color:#2e7d32;font-weight:600;">
+                        <i class="fas fa-envelope" style="color:#D4AF37;margin-right:6px;"></i>
+                        <?php echo ($_SESSION['lang']=='fr')
+                            ? 'À la fin de l\'examen, votre résultat sera transmis à votre administration. Vous serez informé(e) de votre résultat par votre service RH ou votre hiérarchie.'
+                            : 'At the end of the exam, your result will be transmitted to your administration. You will be informed of your result by your HR department or your hierarchy.'; ?>
                     </p>
                     <?php endif; ?>
                 </div>

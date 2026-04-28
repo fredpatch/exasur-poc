@@ -1,8 +1,8 @@
 <?php
 // Connexion aux bases de données
-$servername = "192.168.5.142";
+$servername = "192.168.5.3";
 $port       = 3306;
-$username   = "si_exam";
+$username   = "root";
 $password   = "eth@n@2018";
 
 // Base principale du projet AIR SECURE

@@ -1,23 +1,15 @@
 <?php
 /**
  * soumettre_examen.php — VERSION DÉFINITIVE FINALE
- *
- * LOGIQUE FORM (révisée) :
- *   - 1 session = 1 module (planifié par l'admin à des dates différentes)
- *   - Chaque session a session_examen.idmodule défini
- *   - On enregistre dans evaluation_module + resultats (pour bloquer re-passage)
- *   - La moyenne FORM = moyenne de TOUTES les sessions du même cours (idtypeformation)
- *     déjà passées par ce candidat
- *   - Après chaque module : page intermédiaire avec note + recap cours
- *   - La "dernière" session = toutes les sessions prévues ont été passées
- *     (admin décide combien de modules via session_examen)
- *
- * bind_param vérifié :
- *   IF théorie  : 'iiiddddiiis' (11) ✓
- *   IF pratique : 'iiidddddiiis' (12) ✓
- *   Normal/FORM : 'iiidddiis' (9) ✓
- *   eval_module : 'iiidddi' (7) ✓
+ * MODIFICATION DG : Pour AS, IF Théorie, INST → masquer le score au candidat
+ * Afficher uniquement : message de remerciement + évaluation
+ * 
+ * DURÉES :
+ *   - AS (1) : 90 minutes
+ *   - IF Théorie (2 + type_session='theorie') : 90 minutes
+ *   - INST (3) : 90 minutes
  */
+
 session_start();
 include '../php/db_connection.php';
 include '../lang/lang_loader.php';
@@ -58,6 +50,13 @@ $type_info = $st->get_result()->fetch_assoc(); $st->close();
 if (!$type_info) { header("Location: auth.php"); exit(); }
 $seuil          = floatval($type_info['seuil_reussite']);
 $a_deux_parties = intval($type_info['a_deux_parties']);
+$code_type      = $type_info['code'];
+
+// ── Déterminer si on doit MASQUER le score au candidat ────────────────────────
+// Types concernés : AS (1), IF Théorie (2 + type_session='theorie'), INST (3)
+$types_masquer = [1, 3]; // AS et INST
+$masquer_score = in_array($idtype_examen, $types_masquer) 
+                 || ($idtype_examen == 2 && $type_session === 'theorie');
 
 // ── Récupérer les réponses ────────────────────────────────────────────────────
 $reponses = $_SESSION['reponses'] ?? [];
@@ -90,22 +89,25 @@ $locked = isset($_GET['lock'])?1:0;
 $reason = isset($_GET['reason'])?urldecode($_GET['reason']):(isset($_GET['timeout'])?'Temps écoulé':'');
 
 // ════════════════════════════════════════════════════════════════════════════
-// CAS 1 — IF THÉORIE (inchangé)
+// CAS 1 — IF THÉORIE (durée 90 min, seuil 70%)
 // ════════════════════════════════════════════════════════════════════════════
 if ($a_deux_parties==1 && $idtype_examen==2 && $type_session==='theorie') {
     $reussite_theo = ($pourcentage>=$seuil)?1:0;
     if (!dejaPasse($conn,$idcandidat,$id_session)) {
-        // 11 ? → 'iiiddddiiis' ✓
         $ins=$conn->prepare("INSERT INTO resultats (idcandidat,id_session,idtype_examen,note_theorique,note_finale,note_sur,pourcentage,reussite,reussite_theo,locked,reason,date_fin) VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW())");
-        if($ins){$ins->bind_param("iiiddddiiis",$idcandidat,$id_session,$idtype_examen,$points_obtenus,$note_finale,$note_sur,$pourcentage,$reussite_theo,$reussite_theo,$locked,$reason);$ins->execute();if($ins->error)error_log("IF theo:".$ins->error);$ins->close();}
+        if($ins){$ins->bind_param("iiiddddiiis",$idcandidat,$id_session,$idtype_examen,$points_obtenus,$note_finale,$note_sur,$pourcentage,$reussite_theo,$reussite_theo,$locked,$reason);$ins->execute();$ins->close();}
     }
     deconnecter($conn,$idcandidat);
+    
+    // IF Théorie → rediriger vers attente.php (pour passer la pratique si score ≥70%)
     $_SESSION['resultat']=['nom'=>nomComplet($conn,$idcandidat),'code'=>$_SESSION['code_acces']??'','pourcentage'=>round($pourcentage,2),'reussite'=>$reussite_theo,'type_session'=>'theorie','type_code'=>$type_info['code'],'type_nom'=>$type_info['nom_fr'],'nb_bonnes'=>$points_obtenus,'note_sur'=>$note_sur];
-    $conn->close(); header("Location: attente.php"); exit();
+    $conn->close(); 
+    header("Location: attente.php"); 
+    exit();
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// CAS 2 — IF PRATIQUE (inchangé)
+// CAS 2 — IF PRATIQUE (durée 60 min, seuil 80%)
 // ════════════════════════════════════════════════════════════════════════════
 if ($a_deux_parties==1 && $idtype_examen==2 && $type_session==='pratique') {
     $reussite_prat=($pourcentage>=$seuil)?1:0;
@@ -120,63 +122,46 @@ if ($a_deux_parties==1 && $idtype_examen==2 && $type_session==='pratique') {
     if($reussite_theo&&$reussite_prat&&$moyenne_if<$seuil)$parts[]='Moyenne insuffisante ('.round($moyenne_if,1).'%/min.'.$seuil.'%)';
     $raison=implode(' | ',$parts); $reason_f=$reason?:$raison;
     if(!dejaPasse($conn,$idcandidat,$id_session)){
-        // 12 ? → 'iiidddddiiis' ✓
         $ins=$conn->prepare("INSERT INTO resultats (idcandidat,id_session,idtype_examen,note_pratique,note_finale,note_sur,pourcentage,moyenne_if,reussite,reussite_prat,locked,reason,date_fin) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,NOW())");
-        if($ins){$ins->bind_param("iiidddddiiis",$idcandidat,$id_session,$idtype_examen,$points_obtenus,$note_finale,$note_sur,$pourcentage,$moyenne_if,$reussite_globale,$reussite_prat,$locked,$reason_f);$ins->execute();if($ins->error)error_log("IF prat:".$ins->error);$ins->close();}
+        if($ins){$ins->bind_param("iiidddddiiis",$idcandidat,$id_session,$idtype_examen,$points_obtenus,$note_finale,$note_sur,$pourcentage,$moyenne_if,$reussite_globale,$reussite_prat,$locked,$reason_f);$ins->execute();$ins->close();}
     }
     $sq2=$conn->prepare("SELECT r.id_session AS sid FROM resultats r JOIN session_examen se ON r.id_session=se.id_session WHERE r.idcandidat=? AND se.idtype_examen=2 AND se.type_session='theorie' ORDER BY r.date_fin DESC LIMIT 1");
     if($sq2){$sq2->bind_param("i",$idcandidat);$sq2->execute();$rs=$sq2->get_result()->fetch_assoc();$sq2->close();if($rs){$sid=intval($rs['sid']);$u=$conn->prepare("UPDATE resultats SET reussite=? WHERE idcandidat=? AND id_session=?");if($u){$u->bind_param("iii",$reussite_globale,$idcandidat,$sid);$u->execute();$u->close();}}}
     deconnecter($conn,$idcandidat);
+    
+    // IF Pratique → résultat complet avec score
     $_SESSION['resultat']=['nom'=>nomComplet($conn,$idcandidat),'code'=>$_SESSION['code_acces']??'','pourcentage'=>round($pourcentage,2),'pct_theo'=>round($pct_theo,2),'pct_prat'=>round($pct_prat,2),'moyenne_if'=>round($moyenne_if,2),'reussite'=>$reussite_globale,'reussite_theo'=>$reussite_theo,'reussite_prat'=>$reussite_prat,'type_session'=>'pratique','type_code'=>$type_info['code'],'type_nom'=>$type_info['nom_fr'],'nb_bonnes'=>$points_obtenus,'note_sur'=>$note_sur,'raison_echec'=>$raison];
-    $conn->close(); header("Location: resultat.php"); exit();
+    $conn->close(); 
+    header("Location: resultat.php"); 
+    exit();
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// CAS 3 — FORM (idtype_examen=5) : 1 session = 1 module
-//
-// Architecture :
-//   session_examen.idmodule → module évalué dans cette session
-//   session_examen.idtypeformation → cours auquel appartient ce module
-//
-// Logique :
-//   1. Enregistrer résultat dans evaluation_module + resultats
-//   2. Chercher TOUTES les sessions FORM du même cours (idtypeformation)
-//      habilités pour ce candidat
-//   3. Comparer avec celles déjà passées → calculer progression
-//   4. Si toutes passées → moyenne globale → résultat final
-//   5. Sinon → page intermédiaire avec recap + indication sessions restantes
+// CAS 3 — FORM (idtype_examen=5)
 // ════════════════════════════════════════════════════════════════════════════
 if ($idtype_examen == 5) {
 
     $reussite_module = ($pourcentage >= $seuil) ? 1 : 0;
 
-    // Récupérer infos de la session courante (idmodule, idtypeformation)
     $si = $conn->prepare("SELECT se.idmodule, se.idtypeformation, mf.nom_module_fr, mf.numero_module FROM session_examen se LEFT JOIN module_formation mf ON se.idmodule=mf.idmodule WHERE se.id_session=?");
     $idmodule=0; $idtypeformation=0; $nom_module='Module'; $num_module=0;
     if($si){$si->bind_param("i",$id_session);$si->execute();$ri=$si->get_result()->fetch_assoc();$si->close();
         if($ri){$idmodule=intval($ri['idmodule']);$idtypeformation=intval($ri['idtypeformation']);$nom_module=$ri['nom_module_fr']??'Module';$num_module=intval($ri['numero_module']);}
     }
 
-    // 1. Enregistrer résultat dans evaluation_module (si pas déjà fait)
     $chk_em=$conn->prepare("SELECT id FROM evaluation_module WHERE idcandidat=? AND id_session=?");
     $deja_em=false;
     if($chk_em){$chk_em->bind_param("ii",$idcandidat,$id_session);$chk_em->execute();$deja_em=($chk_em->get_result()->num_rows>0);$chk_em->close();}
     if(!$deja_em && $idmodule>0){
-        // 7 ? → 'iiidddi' ✓
         $ins_em=$conn->prepare("INSERT INTO evaluation_module (idcandidat,id_session,idmodule,note_obtenue,note_sur,pourcentage,reussite,date_eval) VALUES (?,?,?,?,?,?,?,NOW())");
-        if($ins_em){$ins_em->bind_param("iiidddi",$idcandidat,$id_session,$idmodule,$points_obtenus,$note_sur,$pourcentage,$reussite_module);$ins_em->execute();if($ins_em->error)error_log("FORM eval_module:".$ins_em->error);$ins_em->close();}
+        if($ins_em){$ins_em->bind_param("iiidddi",$idcandidat,$id_session,$idmodule,$points_obtenus,$note_sur,$pourcentage,$reussite_module);$ins_em->execute();$ins_em->close();}
     }
 
-    // 2. Enregistrer dans resultats (pour bloquer re-passage de cette session)
     if(!dejaPasse($conn,$idcandidat,$id_session)){
-        // 9 ? → 'iiidddiis' ✓
         $ins=$conn->prepare("INSERT INTO resultats (idcandidat,id_session,idtype_examen,note_finale,note_sur,pourcentage,reussite,locked,reason,date_fin) VALUES (?,?,?,?,?,?,?,?,?,NOW())");
-        if($ins){$ins->bind_param("iiidddiis",$idcandidat,$id_session,$idtype_examen,$points_obtenus,$note_sur,$pourcentage,$reussite_module,$locked,$reason);$ins->execute();if($ins->error)error_log("FORM resultats:".$ins->error);$ins->close();}
+        if($ins){$ins->bind_param("iiidddiis",$idcandidat,$id_session,$idtype_examen,$points_obtenus,$note_sur,$pourcentage,$reussite_module,$locked,$reason);$ins->execute();$ins->close();}
     }
 
-    // 3. Trouver TOUTES les sessions du même cours pour ce candidat
-    //    UNIQUEMENT les sessions d'évaluation de module (idmodule IS NOT NULL)
-    //    La session conteneur (idmodule IS NULL) sert de titre uniquement
     $sq_all=$conn->prepare(
         "SELECT se.id_session, se.nom_session, se.idmodule, se.date_debut,
                 mf.nom_module_fr, mf.numero_module
@@ -191,7 +176,6 @@ if ($idtype_examen == 5) {
     $toutes_sessions=[];
     if($sq_all){$sq_all->bind_param("ii",$idcandidat,$idtypeformation);$sq_all->execute();$rall=$sq_all->get_result();while($row=$rall->fetch_assoc())$toutes_sessions[]=$row;$sq_all->close();}
 
-    /* Récupérer le nom de la session conteneur (idmodule IS NULL) pour affichage titre */
     $nom_conteneur = '';
     $sq_cont=$conn->query("
         SELECT nom_session, date_debut, date_fin FROM session_examen
@@ -204,9 +188,6 @@ if ($idtype_examen == 5) {
             .' → '.date('d/m/Y',strtotime($rc['date_fin'])).')';
     }
 
-    // 4. Sessions déjà passées (résultats existants)
-    //    Inclure la session COURANTE qu'on vient de terminer (note_finale >= 0)
-    //    car elle vient juste d'être insérée avant cette requête
     $sq_done=$conn->prepare(
         "SELECT r.id_session, r.note_finale, r.note_sur, r.pourcentage, r.reussite
          FROM resultats r
@@ -215,13 +196,9 @@ if ($idtype_examen == 5) {
            AND se.idmodule IS NOT NULL
          ORDER BY r.date_fin ASC"
     );
-    $sessions_passees=[]; // [id_session => data]
+    $sessions_passees=[];
     if($sq_done){$sq_done->bind_param("ii",$idcandidat,$idtypeformation);$sq_done->execute();$rdone=$sq_done->get_result();while($row=$rdone->fetch_assoc())$sessions_passees[$row['id_session']]=$row;$sq_done->close();}
 
-    /* CORRECTION BUG "en cours" :
-       La session courante vient d'être insérée dans resultats MAIS
-       elle n'est peut-être pas encore dans $sessions_passees si l'INSERT
-       a eu lieu dans la même transaction. On la force manuellement. */
     if (!isset($sessions_passees[$id_session])) {
         $sessions_passees[$id_session] = [
             'id_session'  => $id_session,
@@ -232,7 +209,6 @@ if ($idtype_examen == 5) {
         ];
     }
 
-    // 5. Calculer progression et recap
     $recap=[]; $total_pct=0.0; $nb_passees=0;
     foreach($toutes_sessions as $sess){
         $sid=intval($sess['id_session']);
@@ -245,15 +221,13 @@ if ($idtype_examen == 5) {
     $nb_total    = count($toutes_sessions);
     $nb_restantes= $nb_total - $nb_passees;
     $is_derniere = ($nb_restantes === 0);
-
-    // 6. Calcul moyenne (si toutes passées)
     $moyenne_form = $nb_passees>0 ? $total_pct/$nb_passees : 0.0;
     $reussite_form= ($moyenne_form>=$seuil)?1:0;
 
     deconnecter($conn,$idcandidat);
     $nom_candidat=nomComplet($conn,$idcandidat);
 
-    // 7. Si dernière session → résultat final complet
+    // FORM : toujours afficher le résultat
     if($is_derniere){
         $_SESSION['resultat']=[
             'nom'            => $nom_candidat,
@@ -265,7 +239,7 @@ if ($idtype_examen == 5) {
             'type_session'   => 'normal',
             'type_code'      => $type_info['code'],
             'type_nom'       => $type_info['nom_fr'],
-            'nom_conteneur'  => $nom_conteneur, /* ← Session FORM parente pour affichage titre */
+            'nom_conteneur'  => $nom_conteneur,
             'is_form_final'  => true,
             'detail_modules' => array_values(array_filter($recap,fn($r)=>$r['done'])),
             'moyenne_form'   => round($moyenne_form,1),
@@ -276,13 +250,12 @@ if ($idtype_examen == 5) {
         header("Location: resultat.php"); exit();
     }
 
-    // 8. Page intermédiaire → note module + recap + info sessions restantes
     $_SESSION['form_module_result']=[
         'nom'             => $nom_candidat,
         'code'            => $_SESSION['code_acces']??'',
         'type_code'       => $type_info['code'],
         'type_nom'        => $type_info['nom_fr'],
-        'nom_conteneur'   => $nom_conteneur, /* ← Session FORM parente (titre) */
+        'nom_conteneur'   => $nom_conteneur,
         'module_termine'  => ['nom'=>$nom_module,'num'=>$num_module,'note'=>round($points_obtenus,1),'sur'=>round($note_sur,1),'pct'=>round($pourcentage,1),'reussite'=>$reussite_module],
         'recap_sessions'  => $recap,
         'nb_total'        => $nb_total,
@@ -296,15 +269,45 @@ if ($idtype_examen == 5) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// CAS 4 — AS, INST, SENS : 9 ? → 'iiidddiis' ✓
+// CAS 4 — AS, INST, SENS (durée 90 min pour AS et INST, seuil 70%)
 // ════════════════════════════════════════════════════════════════════════════
 $reussite=($pourcentage>=$seuil)?1:0;
 if(!dejaPasse($conn,$idcandidat,$id_session)){
     $ins=$conn->prepare("INSERT INTO resultats (idcandidat,id_session,idtype_examen,note_finale,note_sur,pourcentage,reussite,locked,reason,date_fin) VALUES (?,?,?,?,?,?,?,?,?,NOW())");
-    if($ins){$ins->bind_param("iiidddiis",$idcandidat,$id_session,$idtype_examen,$note_finale,$note_sur,$pourcentage,$reussite,$locked,$reason);$ins->execute();if($ins->error)error_log("Normal:".$ins->error);$ins->close();}
-    else error_log("Normal prepare échoué:".$conn->error);
+    if($ins){$ins->bind_param("iiidddiis",$idcandidat,$id_session,$idtype_examen,$note_finale,$note_sur,$pourcentage,$reussite,$locked,$reason);$ins->execute();$ins->close();}
 }
 deconnecter($conn,$idcandidat);
-$_SESSION['resultat']=['nom'=>nomComplet($conn,$idcandidat),'code'=>$_SESSION['code_acces']??'','nb_bonnes'=>$points_obtenus,'note_sur'=>$note_sur,'pourcentage'=>round($pourcentage,2),'reussite'=>$reussite,'type_session'=>$type_session,'type_code'=>$type_info['code'],'type_nom'=>$type_info['nom_fr']];
+
+// Stocker temporairement les infos pour la page de remerciement
+$_SESSION['exam_termine'] = [
+    'type_code'   => $type_info['code'],
+    'type_nom'    => $type_info['nom_fr'],
+    'type_session' => $type_session,
+    'nom'         => nomComplet($conn,$idcandidat),
+    'code'        => $_SESSION['code_acces'] ?? '',
+    'has_score'   => !$masquer_score,
+];
+
 $conn->close();
-header("Location: resultat.php"); exit();
+
+// Redirection selon le type
+if ($masquer_score) {
+    // AS, INST, IF Théorie → page de remerciement sans score
+    header("Location: thank_you.php");
+} else {
+    // SENS, IF Pratique, FORM → page de résultat avec score
+    $_SESSION['resultat']=[
+        'nom'=>$_SESSION['exam_termine']['nom'],
+        'code'=>$_SESSION['exam_termine']['code'],
+        'nb_bonnes'=>$points_obtenus,
+        'note_sur'=>$note_sur,
+        'pourcentage'=>round($pourcentage,2),
+        'reussite'=>$reussite,
+        'type_session'=>$type_session,
+        'type_code'=>$type_info['code'],
+        'type_nom'=>$type_info['nom_fr']
+    ];
+    header("Location: resultat.php");
+}
+exit();
+?>

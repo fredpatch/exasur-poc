@@ -24,11 +24,11 @@ $lang = [
 
     // Categories
     'agent_surete'                  => 'Security Agent',
-    'agent_surete_desc'             => 'Security agent certification (50 MCQ, 80% pass mark)',
+    'agent_surete_desc'             => 'Security agent certification (50 MCQ, 70% pass mark)',
     'agent_if'                      => 'Screening Agent',
-    'agent_if_desc'                 => 'Theoretical (50 MCQ) + practical (50 3D images), average ≥ 80%',
+    'agent_if_desc'                 => 'Theoretical (50 MCQ) + practical (50 3D images), average ≥ 70%',
     'instructeur'                   => 'Instructor',
-    'instructeur_desc'              => 'Security instructor certification (50 random MCQ, 80% pass mark)',
+    'instructeur_desc'              => 'Security instructor certification (50 random MCQ, 70% pass mark)',
     'sensibilisation'               => 'Security Awareness',
     'sensibilisation_desc'          => 'Aviation security awareness (20 MCQ, 70% pass mark)',
     'formation'                     => 'Training Evaluation',
