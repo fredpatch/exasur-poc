@@ -348,19 +348,19 @@ $active_page = 'administrateurs';
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
                         <label class="f-label">Nom *</label>
-                        <input type="text" name="nom" id="fNom" class="f-inp" required placeholder="DUPONT">
+                        <input type="text" name="nom" id="fNom" class="f-inp" required placeholder="MBADINGA">
                     </div>
                     <div class="col-md-6">
                         <label class="f-label">Prénom *</label>
-                        <input type="text" name="prenom" id="fPrenom" class="f-inp" required placeholder="Jean">
+                        <input type="text" name="prenom" id="fPrenom" class="f-inp" required placeholder="Rufin">
                     </div>
                     <div class="col-md-4">
                         <label class="f-label">Code d'accès *</label>
-                        <input type="text" name="code_acces" id="fCode" class="f-inp" required placeholder="ADM003">
+                        <input type="text" name="code_acces" id="fCode" class="f-inp" required placeholder="0111">
                     </div>
                     <div class="col-md-4">
                         <label class="f-label">Email</label>
-                        <input type="email" name="email" id="fEmail" class="f-inp" placeholder="admin@anac.ga">
+                        <input type="email" name="email" id="fEmail" class="f-inp" placeholder="rufin.mbadinga@anac-gabon.com">
                     </div>
                     <div class="col-md-4">
                         <label class="f-label">Rôle *</label>

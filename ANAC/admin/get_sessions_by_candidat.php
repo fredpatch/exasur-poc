@@ -1,6 +1,6 @@
 <?php
 /**
- * get_sessions_by_candidat.php — Sessions d'un candidat
+ * get_sessions_by_candidat.php - Sessions d'un candidat
  * CORRECTION BUG : cherche dans candidat_session ET resultats
  * (un candidat peut avoir passé un examen sans être dans candidat_session)
  */
@@ -30,7 +30,13 @@ while ($s = $r->fetch_assoc()) {
     $label = $s['nom_session'];
     if ($s['type_session'] !== 'normal') $label .= ' ['.ucfirst($s['type_session']).']';
     $label .= '  ·  '.$s['tc'];
-    if ($s['date_debut']) $label .= '  ·  '.date('d/m/Y', strtotime($s['date_debut']));
+    /* Plage complète : du DD/MM/YYYY au DD/MM/YYYY */
+    if ($s['date_debut'] && $s['date_fin']) {
+        $label .= '  ·  du '.date('d/m/Y', strtotime($s['date_debut']))
+               .' au '.date('d/m/Y', strtotime($s['date_fin']));
+    } elseif ($s['date_debut']) {
+        $label .= '  ·  '.date('d/m/Y', strtotime($s['date_debut']));
+    }
     $res[] = ['id_session' => $s['id_session'], 'nom_session' => $label];
 }
 header('Content-Type: application/json');

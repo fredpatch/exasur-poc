@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $qf  = $conn->real_escape_string($_POST['question_text_fr'] ?? '');
     $qe  = $conn->real_escape_string($_POST['question_text_en'] ?? '');
-    $bar = floatval($_POST['bareme'] ?? 2);
+    $bar = 1.00; // Barème auto : 100 ÷ N questions — valeur BDD fixe
 
     /* ── IF Pratique : options fixes Clair/Suspect + catégorie ── */
     if ($tq === 'pratique') {
@@ -153,10 +153,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         WHERE id=$id");
 
     if ($conn->error) {
-        $msg = 'err:'.$conn->error;
+        $msg = 'ERR:'.rawurlencode($conn->error);
     } else {
-        $msg = 'ok';
-        if ($nb_deleted > 0) $msg = 'ok_del:'.$nb_deleted;
+        $msg = $nb_deleted > 0 ? 'OK_DEL:'.$nb_deleted : 'OK';
     }
 
     /* Recharger la question */
@@ -170,8 +169,7 @@ $is_if_pratique = ($q['type_question'] === 'pratique' && $q['idtype_examen'] == 
 ?>
 <!DOCTYPE html>
 <html lang="fr">
-<head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Modifier question #<?= $id ?> — EXASUR ANAC</title>
 <link rel="icon" href="../assets/images/faviconLOGOANAC.ico">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -254,6 +252,9 @@ $is_if_pratique = ($q['type_question'] === 'pratique' && $q['idtype_examen'] == 
     </div>
 </div>
 <div class="admin-content">
+<?php if ($msg): ?>
+<div id="qeResultMarker" data-result="<?= htmlspecialchars($msg, ENT_QUOTES) ?>" style="display:none;"></div>
+<?php endif; ?>
 
 <!-- Aperçu actuel -->
 <div class="card-admin mb-4">
@@ -330,10 +331,8 @@ $is_if_pratique = ($q['type_question'] === 'pratique' && $q['idtype_examen'] == 
                         <option value="pratique"  <?= $q['type_question']==='pratique'?'selected':'' ?>>🖼️ Pratique (IF uniquement)</option>
                     </select>
                 </div>
-                <div class="col-md-2">
-                    <label class="form-label-admin">Barème</label>
-                    <input type="number" name="bareme" class="form-control-admin" value="<?= $q['bareme'] ?>" step="0.5" min="0.5">
-                </div>
+                <!-- Barème masqué — calculé automatiquement : 100 ÷ N questions -->
+                <input type="hidden" name="bareme" value="1">
                 <div class="col-md-6">
                     <label class="form-label-admin">🇫🇷 Question (FR) *</label>
                     <textarea name="question_text_fr" class="form-control-admin" rows="3" required id="qTextFr"><?= htmlspecialchars($q['question_text_fr']) ?></textarea>
@@ -511,7 +510,9 @@ $is_if_pratique = ($q['type_question'] === 'pratique' && $q['idtype_examen'] == 
             </div>
 
             <div class="d-flex gap-3 mt-4">
-                <button type="submit" class="btn-gold"><i class="fas fa-save me-2"></i>Enregistrer les modifications</button>
+                <button type="button" class="btn-gold" id="btnSaveEdit" onclick="enregistrerModification()">
+                    <i class="fas fa-save me-2"></i>Enregistrer les modifications
+                </button>
                 <a href="questions.php" class="btn-anac" style="background:white;color:var(--blue);">
                     <i class="fas fa-arrow-left me-2"></i>Retour
                 </a>
@@ -686,22 +687,103 @@ if (dz) {
     });
 }
 
-/* ── Notifications ─────────────────────────────────────────── */
-<?php if ($msg==='ok'): ?>
-Swal.fire({title:'✅ Question modifiée',icon:'success',timer:2500,timerProgressBar:true,
-    showConfirmButton:false,toast:true,position:'top-end'});
-<?php elseif (str_starts_with($msg,'ok_del:')): ?>
-Swal.fire({
-    title:'✅ Question modifiée',
-    html:`<p style="font-family:Candara,sans-serif;">
-            Modifications enregistrées.<br>
-            <strong><?= intval(substr($msg,7)) ?></strong> image(s) supprimée(s) définitivement du serveur.
-          </p>`,
-    icon:'success',timer:3500,timerProgressBar:true,confirmButtonColor:'#03224c'
-});
-<?php elseif (str_starts_with($msg,'err:')): ?>
-Swal.fire({title:'Erreur',text:<?= json_encode(substr($msg,4)) ?>,icon:'error',confirmButtonColor:'#dc2626'});
-<?php endif; ?>
+/* ═══ ENREGISTRER MODIFICATIONS — AJAX ══════════════════════════════ */
+function enregistrerModification() {
+    const form = document.getElementById('editForm');
+    if (!form) return;
+
+    const btn = document.getElementById('btnSaveEdit');
+    if (btn) { btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin me-2"></i>Enregistrement…'; }
+
+    const fd = new FormData(form);
+
+    fetch(window.location.href, { method:'POST', body:fd })
+        .then(r => { if (!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
+        .then(html => {
+            const doc    = (new DOMParser()).parseFromString(html, 'text/html');
+            const marker = doc.getElementById('qeResultMarker');
+            const result = marker ? marker.getAttribute('data-result') : '';
+
+            if (result === 'OK') {
+                let countdown = 3;
+                Swal.fire({
+                    icon               : 'success',
+                    title              : 'Modifications enregistrées !',
+                    html               : `<div style="text-align:center;font-family:Candara,sans-serif;padding:4px 0;">
+                                            <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:10px 16px;display:inline-block;margin-bottom:14px;">
+                                              <i class="fas fa-check-circle" style="color:#16a34a;margin-right:8px;"></i>
+                                              La question a été mise à jour avec succès.
+                                            </div>
+                                            <p style="font-size:.83rem;color:#9ca3af;margin-top:10px;">
+                                              <i class="fas fa-spinner fa-spin me-1"></i>
+                                              Redirection dans <b id="qe_cnt">${countdown}</b>&nbsp;s…
+                                            </p>
+                                          </div>`,
+                    confirmButtonColor : '#03224c',
+                    confirmButtonText  : '<i class="fas fa-list me-1"></i> Voir les questions',
+                    allowOutsideClick  : false,
+                    timer              : 3000,
+                    timerProgressBar   : true,
+                    didOpen() {
+                        const iv = setInterval(() => {
+                            countdown--;
+                            const el = document.getElementById('qe_cnt');
+                            if (el) el.textContent = countdown;
+                            if (countdown <= 0) clearInterval(iv);
+                        }, 1000);
+                    }
+                }).then(() => { window.location.href = 'questions.php'; });
+
+            } else if (result.startsWith('OK_DEL:')) {
+                const nbDel = result.split(':')[1];
+                let countdown = 3;
+                Swal.fire({
+                    icon               : 'success',
+                    title              : 'Modifications enregistrées !',
+                    html               : `<div style="text-align:center;font-family:Candara,sans-serif;padding:4px 0;">
+                                            <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:10px 16px;display:inline-block;margin-bottom:14px;">
+                                              <i class="fas fa-check-circle" style="color:#16a34a;margin-right:8px;"></i>
+                                              Question mise à jour.
+                                              <strong>${nbDel}</strong> image(s) supprimée(s) du serveur.
+                                            </div>
+                                            <p style="font-size:.83rem;color:#9ca3af;margin-top:10px;">
+                                              <i class="fas fa-spinner fa-spin me-1"></i>
+                                              Redirection dans <b id="qe_cnt">${countdown}</b>&nbsp;s…
+                                            </p>
+                                          </div>`,
+                    confirmButtonColor : '#03224c',
+                    confirmButtonText  : '<i class="fas fa-list me-1"></i> Voir les questions',
+                    allowOutsideClick  : false,
+                    timer              : 3000,
+                    timerProgressBar   : true,
+                    didOpen() {
+                        const iv = setInterval(() => {
+                            countdown--;
+                            const el = document.getElementById('qe_cnt');
+                            if (el) el.textContent = countdown;
+                            if (countdown <= 0) clearInterval(iv);
+                        }, 1000);
+                    }
+                }).then(() => { window.location.href = 'questions.php'; });
+
+            } else if (result.startsWith('ERR:')) {
+                if (btn) { btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-2"></i>Enregistrer les modifications'; }
+                Swal.fire({ icon:'error', title:'Erreur',
+                    text: decodeURIComponent(result.slice(4)),
+                    confirmButtonColor:'#dc2626' });
+            } else {
+                if (btn) { btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-2"></i>Enregistrer les modifications'; }
+                Swal.fire({ icon:'error', title:'Réponse inattendue',
+                    text:'Le serveur n\'a pas retourné de résultat valide. Veuillez réessayer.',
+                    confirmButtonColor:'#03224c' });
+            }
+        })
+        .catch(err => {
+            if (btn) { btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-2"></i>Enregistrer les modifications'; }
+            Swal.fire({ icon:'error', title:'Erreur réseau', text: err.message, confirmButtonColor:'#03224c' });
+        });
+}
+
 </script>
 </body>
 </html>

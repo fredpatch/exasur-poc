@@ -1,23 +1,18 @@
 <?php
 /**
  * examen_start.php — EXASUR ANAC GABON
- * EXASUR/ANAC/candidat/examen_start.php
  *
- * CORRECTION DÉFINITIVE :
- *  examen.php     = UNIQUEMENT IF Pratique (images scanner)
+ * DIRECTIVE DG — DURÉES CORRIGÉES :
+ *  - AS   (type 1)                  : 120 minutes (2h)
+ *  - IF   (type 2) théorie          : 120 minutes (2h)
+ *  - IF   (type 2) pratique         :  90 minutes (1h30)
+ *  - INST (type 3)                  : 120 minutes (2h)
+ *  - SENS (type 4)                  :  60 minutes (inchangé)
+ *  - FORM (type 5)                  : variable selon config BDD
+ *
+ * DISPATCH :
+ *  examen.php     = IF Pratique (images scanner)
  *  examen_qcm.php = AS · IF Théorie · INST · SENS · FORM
- *
- * DURÉES CORRIGÉES :
- *  - AS (type 1) : 90 minutes (1h30)
- *  - IF Théorie (type 2 + type_session='theorie') : 90 minutes (1h30)
- *  - IF Pratique (type 2 + type_session='pratique') : 60 minutes (1h)
- *  - INST (type 3) : 90 minutes (1h30)
- *  - SENS (type 4) : 90 minutes (1h30)
- *  - FORM (type 5) : variable selon configuration
- *
- * Si temp_auth absent → message clair, PAS de boucle de redirections
- * Si résultat fantôme → nettoyage automatique
- * Si résultat complet → afficher résultat
  */
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -25,7 +20,7 @@ if (session_status() === PHP_SESSION_NONE) {
 include '../php/db_connection.php';
 include '../lang/lang_loader.php';
 
-/* ── temp_auth requis ─────────────────────────────────────── */
+/* ── temp_auth requis ─────────────────────────────────────────── */
 if (!isset($_SESSION['temp_auth'])) {
     $conn->close();
     page_erreur(
@@ -43,7 +38,7 @@ $idtype_examen = intval($temp['idtype_examen']);
 $id_session    = intval($temp['id_session']);
 $type_session  = $temp['type_session'];
 
-/* ── Résultat complet existant pour cette session ? ────────── */
+/* ── Résultat complet existant ? ──────────────────────────────── */
 $cr = $conn->prepare(
     "SELECT id, note_finale, locked FROM resultats
      WHERE idcandidat=? AND id_session=? ORDER BY id DESC LIMIT 1"
@@ -57,7 +52,6 @@ if ($res_row) {
     $note   = floatval($res_row['note_finale']);
     $locked = intval($res_row['locked']);
     if ($note > 0 || $locked === 1) {
-        /* Résultat réel → afficher */
         $_SESSION['idcandidat']    = $idcandidat;
         $_SESSION['id_session']    = $id_session;
         $_SESSION['idtype_examen'] = $idtype_examen;
@@ -69,7 +63,6 @@ if ($res_row) {
         header("Location: resultat.php");
         exit();
     } else {
-        /* Résultat fantôme (note=0, non verrouillé) → nettoyer */
         $rid = intval($res_row['id']);
         $conn->query("DELETE FROM resultats WHERE id=$rid");
         $conn->query("DELETE FROM reponses_candidat WHERE idcandidat=$idcandidat AND id_session=$id_session");
@@ -77,7 +70,7 @@ if ($res_row) {
     }
 }
 
-/* ── Connexion simultanée ─────────────────────────────────── */
+/* ── Connexion simultanée ─────────────────────────────────────── */
 $cl = $conn->prepare("SELECT is_logged_in FROM candidat WHERE idcandidat=?");
 $cl->bind_param("i", $idcandidat);
 $cl->execute();
@@ -95,13 +88,13 @@ if ($cl_row && $cl_row['is_logged_in'] == 1) {
     exit();
 }
 
-/* ── Marquer connecté ─────────────────────────────────────── */
+/* ── Marquer connecté ─────────────────────────────────────────── */
 $mk = $conn->prepare("UPDATE candidat SET is_logged_in=1, last_login=NOW() WHERE idcandidat=?");
 $mk->bind_param("i", $idcandidat);
 $mk->execute();
 $mk->close();
 
-/* ── Type d'examen ────────────────────────────────────────── */
+/* ── Type d'examen ────────────────────────────────────────────── */
 $st = $conn->prepare("SELECT * FROM type_examen WHERE idtype_examen=?");
 $st->bind_param("i", $idtype_examen);
 $st->execute();
@@ -121,12 +114,11 @@ if (!$type_info) {
 }
 $a_deux_parties = intval($type_info['a_deux_parties']);
 
-/* ── Charger les questions ────────────────────────────────── */
+/* ── Charger les questions ────────────────────────────────────── */
 $sql_q = "SELECT q.* FROM question q
           JOIN session_questions sq ON q.id=sq.question_id
           WHERE sq.session_id=?";
 
-/* Filtre IF : théorie ou pratique selon l'épreuve */
 if ($a_deux_parties == 1 && $idtype_examen == 2) {
     if ($type_session === 'theorie')  $sql_q .= " AND q.type_question='theorique'";
     if ($type_session === 'pratique') $sql_q .= " AND q.type_question='pratique'";
@@ -139,7 +131,7 @@ $stmt_q->execute();
 $all_questions = $stmt_q->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt_q->close();
 
-/* ── Aucune question ──────────────────────────────────────── */
+/* ── Aucune question ──────────────────────────────────────────── */
 if (empty($all_questions)) {
     $conn->query("UPDATE candidat SET is_logged_in=0 WHERE idcandidat=$idcandidat");
     unset($_SESSION['temp_auth']);
@@ -155,12 +147,12 @@ if (empty($all_questions)) {
     exit();
 }
 
-/* ── Mélanger les questions ───────────────────────────────── */
+/* ── Mélanger les questions ───────────────────────────────────── */
 shuffle($all_questions);
 $questions    = $all_questions;
 $nb_questions = count($questions);
 
-/* ── Progression : créer ou reprendre ────────────────────── */
+/* ── Progression : créer ou reprendre ────────────────────────── */
 $ps = $conn->prepare(
     "SELECT current_index_theo, current_index_pra, infractions, reponses_json
      FROM progression_candidat WHERE idcandidat=? AND id_session=?"
@@ -205,26 +197,33 @@ if ($ps_row->num_rows > 0) {
 }
 $ps->close();
 
-/* ════════════════════════════════════════════════════════════
-   DURÉES CORRIGÉES PAR TYPE D'EXAMEN
-   ════════════════════════════════════════════════════════════ */
-$duree_min = intval($type_info['duree_minutes'] ?? 90);
+/* ══════════════════════════════════════════════════════════════
+   DURÉES — DIRECTIVE DG
+   AS  (1)       : 120 min (2h)
+   IF  (2) théo  : 120 min (2h)
+   IF  (2) prat  :  90 min (1h30)
+   INST(3)       : 120 min (2h)
+   SENS(4)       :  60 min (inchangé)
+   FORM(5)       : variable BDD
+══════════════════════════════════════════════════════════════ */
+$duree_min = intval($type_info['duree_minutes'] ?? 120);
 
-// Forcer les durées spécifiques selon le type et l'épreuve
-if ($idtype_examen == 2) {
-    // IF
+if ($idtype_examen == 1) {
+    $duree_min = 120;  // AS : 2h
+} elseif ($idtype_examen == 2) {
     if ($type_session === 'pratique') {
-        $duree_min = 60;  // IF Pratique : 1 heure
-    } elseif ($type_session === 'theorie') {
-        $duree_min = 90;  // IF Théorie : 1h30
+        $duree_min = 90;   // IF Pratique : 1h30
+    } else {
+        $duree_min = 120;  // IF Théorie  : 2h
     }
-} elseif (in_array($idtype_examen, [1, 3, 4])) {
-    // AS, INST, SENS : 1h30
-    $duree_min = 90;
+} elseif ($idtype_examen == 3) {
+    $duree_min = 120;  // INST : 2h
+} elseif ($idtype_examen == 4) {
+    $duree_min = 60;   // SENS : 1h (inchangé)
 }
-// FORM (type 5) garde la valeur de la BDD
+// FORM (type 5) : garde la valeur de la BDD
 
-/* ── Session PHP définitive ───────────────────────────────── */
+/* ── Session PHP définitive ───────────────────────────────────── */
 $_SESSION['idcandidat']     = $idcandidat;
 $_SESSION['code_acces']     = $temp['code_acces'];
 $_SESSION['idtype_examen']  = $idtype_examen;
@@ -257,12 +256,11 @@ if ($idtype_examen == 5) {
 unset($_SESSION['temp_auth']);
 $conn->close();
 
-/* ══════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════════
    DISPATCH FINAL
-   ─────────────────────────────────────────────────────────
    examen.php     = IF pratique (images scanner)
-   examen_qcm.php = TOUS les autres (AS, IF théorie, SENS, INST, FORM)
-══════════════════════════════════════════════════════════ */
+   examen_qcm.php = TOUS les autres (AS, IF théorie, INST, SENS, FORM)
+══════════════════════════════════════════════════════════════ */
 if ($idtype_examen == 2 && $type_session === 'pratique') {
     header("Location: examen.php");
 } else {
@@ -270,9 +268,9 @@ if ($idtype_examen == 2 && $type_session === 'pratique') {
 }
 exit();
 
-/* ════════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════════
    PAGE D'ERREUR SWAL
-════════════════════════════════════════════════════════════ */
+══════════════════════════════════════════════════════════════ */
 function page_erreur(string $titre, string $message, string $retour, string $type = 'error'): void
 {
     $t   = json_encode($titre,   JSON_UNESCAPED_UNICODE);

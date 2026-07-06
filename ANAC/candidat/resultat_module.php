@@ -1,6 +1,6 @@
 <?php
 /**
- * resultat_module.php — Page intermédiaire FORM
+ * resultat_module.php - Page intermédiaire FORM
  * Affiche : note du module terminé + récap de toutes les sessions du cours
  * + sessions restantes à passer
  */
@@ -15,7 +15,7 @@ $d     = $_SESSION['form_module_result'];
 $mod   = $d['module_termine'];
 $recap = $d['recap_sessions'];
 $lang  = $_SESSION['lang'] ?? 'fr';
-$nom_conteneur = $d['nom_conteneur'] ?? ''; /* Session FORM parente — titre uniquement */
+$nom_conteneur = $d['nom_conteneur'] ?? ''; /* Session FORM parente - titre uniquement */
 
 // Séparer les sessions passées et restantes
 // La session conteneur (idmodule IS NULL) est déjà exclue du recap (filtrée dans soumettre_examen.php)
@@ -26,7 +26,7 @@ $sessions_todo = array_filter($recap, fn($s) => !$s['done']);
 <html lang="<?= $lang ?>">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>ANAC — Résultat Module <?= $mod['num'] ?></title>
+    <title>ANAC - Résultat Module <?= $mod['num'] ?></title>
     <link rel="icon" href="../assets/images/LOGOANAC.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -85,12 +85,12 @@ $sessions_todo = array_filter($recap, fn($s) => !$s['done']);
 
 <div class="card-r">
 <div class="hdr">
-    <h2><i class="fas fa-clipboard-check me-2"></i>Résultat — Module <?= $mod['num'] ?></h2>
+    <h2><i class="fas fa-clipboard-check me-2"></i>Résultat - Module <?= $mod['num'] ?></h2>
     <div class="cand">
         <span><i class="fas fa-user me-1"></i><?= htmlspecialchars($d['nom']) ?></span>
         <span><i class="fas fa-key me-1"></i>Code : <strong><?= htmlspecialchars($d['code']) ?></strong></span>
         <span style="background:rgba(212,175,55,.25);padding:3px 12px;border-radius:20px;color:#D4AF37;font-weight:700;">
-            <?= htmlspecialchars($d['type_code'].' — '.$d['type_nom']) ?>
+            <?= htmlspecialchars($d['type_code'].' - '.$d['type_nom']) ?>
         </span>
     </div>
 </div>
@@ -130,7 +130,7 @@ $sessions_todo = array_filter($recap, fn($s) => !$s['done']);
     <?php endif; ?>
     <h6 style="color:var(--b);font-weight:800;margin-bottom:8px;">
         <i class="fas fa-list-check me-2" style="color:var(--g);"></i>
-        Avancement — <?= $d['nb_passees'] ?>/<?= $d['nb_total'] ?> évaluation(s) passée(s)
+        Avancement - <?= $d['nb_passees'] ?>/<?= $d['nb_total'] ?> évaluation(s) passée(s)
     </h6>
     <table class="recap-tbl">
         <thead>
@@ -154,13 +154,13 @@ $sessions_todo = array_filter($recap, fn($s) => !$s['done']);
                 <?php endif; ?>
             </td>
             <td>
-                <?= $sess['done'] ? $sess['note'].'/'.$sess['sur'].' pts' : '—' ?>
+                <?= $sess['done'] ? $sess['note'].'/'.$sess['sur'].' pts' : '-' ?>
             </td>
             <td>
                 <?php if($sess['done']): ?>
                     <?= $sess['pct'] ?>%
                     <div class="bar-w"><div class="bar-f" style="width:<?= min($sess['pct'],100) ?>%;background:<?= $sess['reussite']?'#28a745':'#dc3545' ?>;"></div></div>
-                <?php else: ?>—<?php endif; ?>
+                <?php else: ?>-<?php endif; ?>
             </td>
             <td>
                 <?php if($sess['done']): ?>
@@ -187,7 +187,7 @@ $sessions_todo = array_filter($recap, fn($s) => !$s['done']);
             <div class="moy-label" style="color:<?= $is_final?($reussite_finale?'#15803d':'#b91c1c'):'var(--b)' ?>">
                 <i class="fas fa-<?= $is_final?'flag-checkered':'calculator' ?> me-2" style="color:<?= $is_final?($reussite_finale?'#28a745':'#dc2626'):'var(--g)' ?>;"></i>
                 <?php if($is_final): ?>
-                    Résultat FINAL — <?= $d['nb_passees'] ?> module<?= $d['nb_passees']>1?'s':'' ?> évalué<?= $d['nb_passees']>1?'s':'' ?>
+                    Résultat FINAL - <?= $d['nb_passees'] ?> module<?= $d['nb_passees']>1?'s':'' ?> évalué<?= $d['nb_passees']>1?'s':'' ?>
                 <?php else: ?>
                     Moyenne provisoire (<?= $d['nb_passees'] ?>/<?= $d['nb_total'] ?> module<?= $d['nb_passees']>1?'s':'' ?>)
                 <?php endif; ?>
@@ -195,12 +195,12 @@ $sessions_todo = array_filter($recap, fn($s) => !$s['done']);
             <?php if($is_final): ?>
             <div style="font-size:.88rem;font-weight:700;margin-top:4px;color:<?= $reussite_finale?'#15803d':'#b91c1c' ?>">
                 <?= $reussite_finale
-                    ? '✅ Formation validée — Moyenne ≥ '.$seuil.'%'
-                    : '❌ Formation non validée — Moyenne < '.$seuil.'%' ?>
+                    ? '✅ Formation validée - Moyenne ≥ '.$seuil.'%'
+                    : '❌ Formation non validée - Moyenne < '.$seuil.'%' ?>
             </div>
             <?php else: ?>
             <div style="color:#666;font-size:.82rem;margin-top:2px;">
-                <?= count($sessions_todo) ?> module<?= count($sessions_todo)>1?'s':'' ?> restant<?= count($sessions_todo)>1?'s':'' ?> — la note finale sera calculée à l'issue de toutes les évaluations.
+                <?= count($sessions_todo) ?> module<?= count($sessions_todo)>1?'s':'' ?> restant<?= count($sessions_todo)>1?'s':'' ?> - la note finale sera calculée à l'issue de toutes les évaluations.
             </div>
             <?php endif; ?>
         </div>
@@ -222,7 +222,7 @@ $sessions_todo = array_filter($recap, fn($s) => !$s['done']);
             <div class="todo-num"><?= $todo['num_module']?:'?' ?></div>
             <div>
                 <strong>
-                    <?= $todo['num_module']?'Module '.$todo['num_module'].' — ':'Session — ' ?>
+                    <?= $todo['num_module']?'Module '.$todo['num_module'].' - ':'Session - ' ?>
                     <?= htmlspecialchars($todo['nom_module']??$todo['nom_session']) ?>
                 </strong>
                 <br><small class="text-muted">
@@ -242,7 +242,7 @@ $sessions_todo = array_filter($recap, fn($s) => !$s['done']);
     </div>
     <?php endif; ?>
 
-    <!-- ══ Évaluation de l'expérience — inline, sans rechargement ══ -->
+    <!-- ══ Évaluation de l'expérience - inline, sans rechargement ══ -->
     <div id="evalBox" style="background:linear-gradient(135deg,#fffbef,#fff8e1);border:1.5px solid var(--g);border-radius:14px;padding:18px 20px;margin-top:18px;text-align:center;">
         <div style="font-weight:800;color:var(--b);font-size:.95rem;margin-bottom:4px;">
             <i class="fas fa-star me-1" style="color:var(--g);"></i>Évaluez votre expérience

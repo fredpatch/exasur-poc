@@ -1,6 +1,6 @@
 <?php
 /**
- * soumettre_examen.php — VERSION DÉFINITIVE FINALE
+ * soumettre_examen.php - VERSION DÉFINITIVE FINALE
  * MODIFICATION DG : Pour AS, IF Théorie, INST → masquer le score au candidat
  * Afficher uniquement : message de remerciement + évaluation
  * 
@@ -71,25 +71,32 @@ if (empty($reponses)) {
 }
 
 // ── Calcul de la note ─────────────────────────────────────────────────────────
-$points_obtenus = 0.0; $points_max = 0.0;
+// CORRECTION : le barème est TOUJOURS 100 ÷ N questions (directive DG)
+// On ignore la valeur stockée en BDD (bareme colonne) qui peut être 2 sur les anciennes questions.
+$nb_questions_session = count($questions);
+$bareme_unitaire = $nb_questions_session > 0 ? (100.0 / $nb_questions_session) : 1.0;
+
+$points_obtenus = 0.0;
 $upd = $conn->prepare("UPDATE reponses_candidat SET selected_option=?,est_correcte=? WHERE idcandidat=? AND question_id=? AND id_session=?");
 foreach ($questions as $q) {
-    $qid=intval($q['id']); $correct=intval($q['correct_option']);
-    $choisie=isset($reponses[$qid])?intval($reponses[$qid]):null;
-    $bareme=floatval($q['bareme']??2);
-    $ok=($choisie!==null&&$choisie===$correct)?1:0;
-    if($ok) $points_obtenus+=$bareme; $points_max+=$bareme;
-    if($upd){$upd->bind_param("iiiii",$choisie,$ok,$idcandidat,$qid,$id_session);$upd->execute();}
+    $qid    = intval($q['id']);
+    $correct= intval($q['correct_option']);
+    $choisie= isset($reponses[$qid]) ? intval($reponses[$qid]) : null;
+    $ok     = ($choisie !== null && $choisie === $correct) ? 1 : 0;
+    if ($ok) $points_obtenus += $bareme_unitaire;
+    if ($upd) { $upd->bind_param("iiiii", $choisie, $ok, $idcandidat, $qid, $id_session); $upd->execute(); }
 }
-if($upd) $upd->close();
-$pourcentage = $points_max>0 ? ($points_obtenus/$points_max)*100 : 0.0;
+if ($upd) $upd->close();
+
+$points_max  = 100.0;  // toujours sur 100
+$pourcentage = $points_obtenus;  // = nb_bonnes × (100/N) = déjà en %
 $note_finale = $points_obtenus;
-$note_sur    = $points_max>0 ? $points_max : 100.0;
+$note_sur    = 100.0;
 $locked = isset($_GET['lock'])?1:0;
 $reason = isset($_GET['reason'])?urldecode($_GET['reason']):(isset($_GET['timeout'])?'Temps écoulé':'');
 
 // ════════════════════════════════════════════════════════════════════════════
-// CAS 1 — IF THÉORIE (durée 90 min, seuil 70%)
+// CAS 1 - IF THÉORIE (durée 90 min, seuil 70%)
 // ════════════════════════════════════════════════════════════════════════════
 if ($a_deux_parties==1 && $idtype_examen==2 && $type_session==='theorie') {
     $reussite_theo = ($pourcentage>=$seuil)?1:0;
@@ -107,7 +114,7 @@ if ($a_deux_parties==1 && $idtype_examen==2 && $type_session==='theorie') {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// CAS 2 — IF PRATIQUE (durée 60 min, seuil 80%)
+// CAS 2 - IF PRATIQUE (durée 60 min, seuil 80%)
 // ════════════════════════════════════════════════════════════════════════════
 if ($a_deux_parties==1 && $idtype_examen==2 && $type_session==='pratique') {
     $reussite_prat=($pourcentage>=$seuil)?1:0;
@@ -137,7 +144,7 @@ if ($a_deux_parties==1 && $idtype_examen==2 && $type_session==='pratique') {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// CAS 3 — FORM (idtype_examen=5)
+// CAS 3 - FORM (idtype_examen=5)
 // ════════════════════════════════════════════════════════════════════════════
 if ($idtype_examen == 5) {
 
@@ -214,7 +221,7 @@ if ($idtype_examen == 5) {
         $sid=intval($sess['id_session']);
         $done=isset($sessions_passees[$sid]);
         $row_done=$done?$sessions_passees[$sid]:null;
-        $recap[]=['id_session'=>$sid,'nom_session'=>$sess['nom_session'],'nom_module'=>$sess['nom_module_fr']??'—','num_module'=>$sess['numero_module']??0,'done'=>$done,'note'=>$done?round(floatval($row_done['note_finale']),1):null,'sur'=>$done?round(floatval($row_done['note_sur']),1):null,'pct'=>$done?round(floatval($row_done['pourcentage']),1):null,'reussite'=>$done?intval($row_done['reussite']):null,'courante'=>($sid==$id_session)];
+        $recap[]=['id_session'=>$sid,'nom_session'=>$sess['nom_session'],'nom_module'=>$sess['nom_module_fr']??'-','num_module'=>$sess['numero_module']??0,'done'=>$done,'note'=>$done?round(floatval($row_done['note_finale']),1):null,'sur'=>$done?round(floatval($row_done['note_sur']),1):null,'pct'=>$done?round(floatval($row_done['pourcentage']),1):null,'reussite'=>$done?intval($row_done['reussite']):null,'courante'=>($sid==$id_session)];
         if($done){$total_pct+=floatval($row_done['pourcentage']);$nb_passees++;}
     }
 
@@ -269,7 +276,7 @@ if ($idtype_examen == 5) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// CAS 4 — AS, INST, SENS (durée 90 min pour AS et INST, seuil 70%)
+// CAS 4 - AS, INST, SENS (durée 90 min pour AS et INST, seuil 70%)
 // ════════════════════════════════════════════════════════════════════════════
 $reussite=($pourcentage>=$seuil)?1:0;
 if(!dejaPasse($conn,$idcandidat,$id_session)){

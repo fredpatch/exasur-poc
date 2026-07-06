@@ -488,12 +488,51 @@ function copierTableau(){
 
 /* Notifications */
 <?php if($msg==='edit_ok'): ?>
-Swal.fire({title:'✅ Session modifiée',icon:'success',timer:2000,showConfirmButton:false,toast:true,position:'top-end'});
+Swal.fire({
+    icon:'success',
+    title:'<i class="fas fa-check-circle" style="color:#16a34a"></i>&nbsp; Session modifiée !',
+    html:'<p style="font-size:.95rem;color:#374151;">Les informations de la session ont été enregistrées avec succès.</p>'
+        +'<p style="font-size:.8rem;color:#9ca3af;margin-top:8px;"><i class="fas fa-arrow-right me-1"></i>Redirection dans <b id="cntdwn">3</b>s...</p>',
+    confirmButtonColor:'#03224c',
+    confirmButtonText:'<i class="fas fa-list me-1"></i> Retour aux sessions',
+    allowOutsideClick:false,
+    timer:3000, timerProgressBar:true,
+    didOpen:function(){
+        var n=3; var iv=setInterval(function(){n--;var el=document.getElementById('cntdwn');if(el)el.textContent=n;if(n<=0)clearInterval(iv);},1000);
+    }
+}).then(function(){ window.location.href='sessions.php'; });
+
 <?php elseif($msg==='cands_ok'): ?>
-Swal.fire({title:'✅ Candidats mis à jour',text:'Tableau des accès affiché ci-dessus.',icon:'success',timer:2500,showConfirmButton:false,toast:true,position:'top-end'});
+Swal.fire({
+    icon:'success',
+    title:'<i class="fas fa-users" style="color:#16a34a"></i>&nbsp; Candidats mis à jour !',
+    html:'<p style="font-size:.95rem;color:#374151;">Les candidats ont été enregistrés. Tableau des accès affiché ci-dessus.</p>'
+        +'<p style="font-size:.8rem;color:#9ca3af;margin-top:8px;"><i class="fas fa-arrow-right me-1"></i>Redirection dans <b id="cntdwn">4</b>s...</p>',
+    confirmButtonColor:'#03224c',
+    confirmButtonText:'<i class="fas fa-list me-1"></i> Retour aux sessions',
+    allowOutsideClick:false,
+    timer:4000, timerProgressBar:true,
+    didOpen:function(){
+        var n=4; var iv=setInterval(function(){n--;var el=document.getElementById('cntdwn');if(el)el.textContent=n;if(n<=0)clearInterval(iv);},1000);
+    }
+}).then(function(){ window.location.href='sessions.php'; });
 setTimeout(()=>document.getElementById('printZone')?.scrollIntoView({behavior:'smooth'}),300);
+
 <?php elseif($msg==='cands_ok_no_export'): ?>
-Swal.fire({title:'✅ Candidats mis à jour',text:'Aucun nouveau candidat ajouté — pas de tableau d\'accès.',icon:'success',timer:2500,showConfirmButton:false,toast:true,position:'top-end'});
+Swal.fire({
+    icon:'success',
+    title:'<i class="fas fa-check-circle" style="color:#16a34a"></i>&nbsp; Candidats mis à jour !',
+    html:'<p style="font-size:.95rem;color:#374151;">Aucun nouveau candidat ajouté.</p>'
+        +'<p style="font-size:.8rem;color:#9ca3af;margin-top:8px;"><i class="fas fa-arrow-right me-1"></i>Redirection dans <b id="cntdwn">3</b>s...</p>',
+    confirmButtonColor:'#03224c',
+    confirmButtonText:'<i class="fas fa-list me-1"></i> Retour aux sessions',
+    allowOutsideClick:false,
+    timer:3000, timerProgressBar:true,
+    didOpen:function(){
+        var n=3; var iv=setInterval(function(){n--;var el=document.getElementById('cntdwn');if(el)el.textContent=n;if(n<=0)clearInterval(iv);},1000);
+    }
+}).then(function(){ window.location.href='sessions.php'; });
+
 <?php elseif($msg && !in_array($msg,['edit_ok','cands_ok','cands_ok_no_export'])): ?>
 Swal.fire({title:'Erreur',text:<?= json_encode($msg) ?>,icon:'error',confirmButtonColor:'#dc2626'});
 <?php endif; ?>

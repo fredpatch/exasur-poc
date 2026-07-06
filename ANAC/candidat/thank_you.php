@@ -1,6 +1,6 @@
 <?php
 /**
- * thank_you.php — Page de remerciement pour AS, IF Théorie, INST
+ * thank_you.php - Page de remerciement pour AS, IF Théorie, INST
  * Affiche : message de confirmation, résultat transmis à l'administration
  * + formulaire d'évaluation de l'expérience
  */
@@ -38,7 +38,7 @@ unset($_SESSION['exam_termine']);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EXASUR — Merci - <?php echo htmlspecialchars($exam['type_code']); ?></title>
+    <title>EXASUR - Merci - <?php echo htmlspecialchars($exam['type_code']); ?></title>
     <link rel="icon" href="../assets/images/LOGOANAC.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -260,7 +260,7 @@ unset($_SESSION['exam_termine']);
                 <i class="fas fa-check-circle"></i>
             </div>
             <h2>MERCI</h2>
-            <p><?php echo htmlspecialchars($exam['type_code'] . ' — ' . $exam['type_nom']); ?></p>
+            <p><?php echo htmlspecialchars($exam['type_code'] . ' - ' . $exam['type_nom']); ?></p>
         </div>
 
         <div class="card-body">
@@ -311,7 +311,7 @@ unset($_SESSION['exam_termine']);
     </div>
 
     <div class="footer-note">
-        &copy; <?php echo date('Y'); ?> ANAC GABON — EXASUR · Direction de la Sûreté & Facilitation
+        &copy; <?php echo date('Y'); ?> ANAC GABON - EXASUR · Direction de la Sûreté & Facilitation
     </div>
 </div>
 

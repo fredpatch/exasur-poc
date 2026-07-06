@@ -69,13 +69,13 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action']??'')==='add_q') {
     $tq  = ($_POST['type_question']??'theorique')==='pratique' ? 'pratique' : 'theorique';
 
     if ($tq==='pratique' && $ite!=2) {
-        $_SESSION['q_err']='pratique_refused';
-        header("Location: questions.php"); exit();
+        echo '<div id="qResultMarker" data-result="ERR:pratique_refused" style="display:none;"></div>';
+        exit();
     }
 
     $qf  = $conn->real_escape_string(trim($_POST['question_text_fr']??''));
     $qe  = $conn->real_escape_string(trim($_POST['question_text_en']??''));
-    $bar = floatval($_POST['bareme']??2);
+    $bar = 1.00;
 
     if ($tq==='pratique') {
         $o1f = 'Bagage CLAIR'; $o1e = 'CLEAR Baggage';
@@ -110,7 +110,9 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action']??'')==='add_q') {
                 VALUES ($ite, 'pratique', '$qf', '$qe', $imgs_json, $traits_json,
                 '$o1f', '$o1e', '$o2f', '$o2e', $o3_sql, $co, $bar)";
             $conn->query($sql);
-            $_SESSION[$conn->error ? 'q_err' : 'q_msg'] = $conn->error ?: 'ok';
+            $res = $conn->error ? 'ERR:'.rawurlencode($conn->error) : 'OK:pratique:'.$conn->insert_id;
+        } else {
+            $res = 'ERR:'.rawurlencode('Le texte de la question (FR) est obligatoire.');
         }
     } else {
         $o1f=$conn->real_escape_string($_POST['option1_fr']??'');
@@ -127,10 +129,14 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action']??'')==='add_q') {
                  option1_fr,option1_en,option2_fr,option2_en,option3_fr,option4_fr,
                  correct_option,bareme)
                 VALUES ($ite,'theorique','$qf','$qe','$o1f','$o1e','$o2f','$o2e',$o3s,$o4s,$co,$bar)");
-            $_SESSION[$conn->error ? 'q_err' : 'q_msg'] = $conn->error ?: 'ok';
+            $res = $conn->error ? 'ERR:'.rawurlencode($conn->error) : 'OK:theorique:'.$conn->insert_id;
+        } else {
+            $res = 'ERR:'.rawurlencode('Champs obligatoires manquants (Question FR, Option 1, Option 2).');
         }
     }
-    header("Location: questions.php"); exit();
+    // Marqueur lu par fetch() côté JS
+    echo '<div id="qResultMarker" data-result="'.htmlspecialchars($res, ENT_QUOTES).'" style="display:none;"></div>';
+    exit();
 }
 
 /* ── Filtres ──────────────────────────────────────────────── */
@@ -366,10 +372,8 @@ textarea.champ-fr,textarea.champ-en{padding-right:32px;}
                         <i class="fas fa-info-circle me-1" style="color:var(--gold);"></i>Disponible seulement pour IF
                     </div>
                 </div>
-                <div class="col-md-2">
-                    <label class="form-label-admin">Barème (pts)</label>
-                    <input type="number" name="bareme" class="form-control-admin" value="2" step="0.5" min="0.5">
-                </div>
+                <!-- Barème masqué — calculé automatiquement : 100 ÷ N questions -->
+                <input type="hidden" name="bareme" value="1">
                 <div class="col-md-2" id="colCorrect">
                     <label class="form-label-admin">Bonne réponse *</label>
                     <select name="correct_option" class="form-select-admin">
@@ -490,7 +494,9 @@ textarea.champ-fr,textarea.champ-en{padding-right:32px;}
             </div>
 
             <div class="d-flex gap-3 mt-4">
-                <button type="submit" class="btn-gold"><i class="fas fa-save me-2"></i>Enregistrer la question</button>
+                <button type="button" class="btn-gold" onclick="enregistrerQuestion()">
+                    <i class="fas fa-save me-2"></i>Enregistrer la question
+                </button>
                 <button type="button" class="btn-anac" style="background:white;color:var(--blue);" onclick="closeAddPanel()">
                     <i class="fas fa-times me-1"></i>Annuler
                 </button>
@@ -580,7 +586,7 @@ textarea.champ-fr,textarea.champ-en{padding-right:32px;}
         <div style="overflow-x:auto;">
             <table class="table-admin" id="tblQ">
                 <thead>
-                    <tr><th>#</th><th>Type</th><th>Épreuve</th><th>Question</th><th>Images</th><th>Barème</th><th>Bonne réponse</th><th>Actions</th></tr>
+                    <tr><th>#</th><th>Type</th><th>Épreuve</th><th>Question</th><th>Images</th><th>Bonne réponse</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                 <?php 
@@ -640,7 +646,6 @@ textarea.champ-fr,textarea.champ-en{padding-right:32px;}
                         if(count($imgs_q)>3): ?><small style="color:#9ca3af;">+<?= count($imgs_q)-3 ?></small><?php endif;
                         else: ?>—<?php endif; ?>
                     </td>
-                    <td style="font-weight:700;"><?= $q['bareme'] ?>pts</span></td>
                     <td class="opt-ok" style="font-size:.82rem;max-width:200px;">
                         <?= $q['type_question']==='pratique'
                             ? htmlspecialchars($rep_ok)
@@ -997,10 +1002,100 @@ function initTradAuto() {
 document.addEventListener('DOMContentLoaded', function() { initTradAuto(); });
 
 /* ── Notifications ──────────────────────────────────────── */
-<?php if($qmsg==='ok'): ?>Swal.fire({title:'✅ Question ajoutée',icon:'success',timer:2500,timerProgressBar:true,showConfirmButton:false,position:'top-end',toast:true});<?php endif; ?>
-<?php if($qmsg==='deleted'): ?>Swal.fire({title:'🗑️ Question supprimée',text:'La question a été supprimée avec succès.',icon:'success',timer:2500,timerProgressBar:true,showConfirmButton:false,position:'top-end',toast:true});<?php endif; ?>
-<?php if($qerr==='pratique_refused'): ?>Swal.fire({icon:'warning',title:'⚠️ Non autorisé',text:'La pratique est réservée à l\'examen IF.',confirmButtonColor:'#03224c'});<?php endif; ?>
-<?php if($qerr && $qerr!=='pratique_refused' && $qerr!=='deleted'): ?>Swal.fire({title:'Erreur',text:<?= json_encode($qerr) ?>,icon:'error',confirmButtonColor:'#dc2626'});<?php endif; ?>
+/* ═══ ENREGISTRER QUESTION — AJAX ══════════════════════════════════════ */
+function enregistrerQuestion() {
+    const form = document.getElementById('addForm');
+    if (!form) return;
+
+    // Validation rapide côté JS
+    const qfr = form.querySelector('[name="question_text_fr"]');
+    if (qfr && !qfr.value.trim()) {
+        Swal.fire({ icon:'warning', title:'Champ obligatoire',
+            text:'Le texte de la question en français est obligatoire.',
+            confirmButtonColor:'#03224c' });
+        return;
+    }
+
+    const btn = form.querySelector('button.btn-gold');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Enregistrement…'; }
+
+    const fd = new FormData(form);
+
+    fetch(window.location.href, { method:'POST', body:fd })
+        .then(r => { if (!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
+        .then(html => {
+            const doc    = (new DOMParser()).parseFromString(html, 'text/html');
+            const marker = doc.getElementById('qResultMarker');
+            const result = marker ? marker.getAttribute('data-result') : '';
+
+            if (result.startsWith('OK:')) {
+                const parts    = result.split(':');
+                const typeQ    = parts[1]; // 'theorique' ou 'pratique'
+                const newId    = parts[2]  || '';
+                const libType  = typeQ === 'pratique' ? '🖼️ Pratique IF' : '📝 Théorique';
+                let countdown  = 3;
+
+                Swal.fire({
+                    icon               : 'success',
+                    title              : 'Question ajoutée !',
+                    html               : `<div style="text-align:center;font-family:Candara,sans-serif;padding:4px 0;">
+                                            <p style="font-size:1rem;color:#374151;margin-bottom:12px;">
+                                              La question <strong>${libType}</strong> a été enregistrée avec succès.
+                                              ${newId ? '<br><small style="color:#9ca3af;">ID #'+newId+'</small>' : ''}
+                                            </p>
+                                            <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:10px 16px;display:inline-block;">
+                                              <i class="fas fa-check-circle" style="color:#16a34a;margin-right:8px;"></i>
+                                              Question enregistrée en base de données
+                                            </div>
+                                            <p style="font-size:.83rem;color:#9ca3af;margin-top:12px;">
+                                              <i class="fas fa-spinner fa-spin me-1"></i>
+                                              Redirection dans <b id="q_cnt">${countdown}</b>&nbsp;s…
+                                            </p>
+                                          </div>`,
+                    confirmButtonColor : '#03224c',
+                    confirmButtonText  : '<i class="fas fa-list me-1"></i> Voir les questions',
+                    allowOutsideClick  : false,
+                    timer              : 3000,
+                    timerProgressBar   : true,
+                    didOpen() {
+                        const iv = setInterval(() => {
+                            countdown--;
+                            const el = document.getElementById('q_cnt');
+                            if (el) el.textContent = countdown;
+                            if (countdown <= 0) clearInterval(iv);
+                        }, 1000);
+                    }
+                }).then(() => { window.location.href = 'questions.php'; });
+
+            } else if (result.startsWith('ERR:pratique_refused')) {
+                if (btn) { btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-2"></i>Enregistrer la question'; }
+                Swal.fire({ icon:'warning', title:'Non autorisé',
+                    html:'La pratique (images) est réservée à l\'examen <strong>IF - Inspection Filtrage</strong>.',
+                    confirmButtonColor:'#03224c' });
+
+            } else if (result.startsWith('ERR:')) {
+                if (btn) { btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-2"></i>Enregistrer la question'; }
+                Swal.fire({ icon:'error', title:'Erreur',
+                    text: decodeURIComponent(result.slice(4)),
+                    confirmButtonColor:'#dc2626' });
+
+            } else {
+                if (btn) { btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-2"></i>Enregistrer la question'; }
+                Swal.fire({ icon:'error', title:'Réponse inattendue',
+                    text:'Le serveur n\'a pas retourné de résultat valide. Veuillez réessayer.',
+                    confirmButtonColor:'#03224c' });
+            }
+        })
+        .catch(err => {
+            if (btn) { btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-2"></i>Enregistrer la question'; }
+            Swal.fire({ icon:'error', title:'Erreur réseau', text: err.message, confirmButtonColor:'#03224c' });
+        });
+}
+<?php if($qmsg==='deleted'): ?>
+Swal.fire({title:'🗑️ Question supprimée',text:'La question a été supprimée avec succès.',icon:'success',timer:2500,timerProgressBar:true,showConfirmButton:false,position:'top-end',toast:true});
+<?php elseif($qerr && $qerr!=='pratique_refused'): ?>
+Swal.fire({title:'Erreur',text:<?= json_encode($qerr) ?>,icon:'error',confirmButtonColor:'#dc2626'});
+<?php endif; ?>
 </script>
 </body>
 </html>

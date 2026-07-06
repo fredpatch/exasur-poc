@@ -1,6 +1,6 @@
 <?php
 /**
- * print_questions.php — Banque de Questions EXASUR · ANAC GABON
+ * print_questions.php -Banque de Questions EXASUR · ANAC GABON
  * ═══════════════════════════════════════════════════════════════
  * Génère un document PDF/impression de la banque de questions
  * selon les mêmes filtres que questions.php :
@@ -59,7 +59,7 @@ $type_label = 'Toutes les questions';
 $type_code_label = '';
 if ($f_type) {
     $tr = $conn->query("SELECT nom_fr, code FROM type_examen WHERE idtype_examen=$f_type")->fetch_assoc();
-    if ($tr) { $type_label = $tr['code'].' — '.$tr['nom_fr']; $type_code_label = $tr['code']; }
+    if ($tr) { $type_label = $tr['code'].' -'.$tr['nom_fr']; $type_code_label = $tr['code']; }
 }
 
 $sess_label = '';
@@ -93,7 +93,7 @@ $LETTERS = ['A','B','C','D'];
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Banque de Questions — EXASUR ANAC GABON</title>
+<title>Banque de Questions -EXASUR ANAC GABON</title>
 <link rel="icon" href="../assets/images/faviconLOGOANAC.ico">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
@@ -561,12 +561,12 @@ body {
     <div>
         <div class="ab-title">
             <i class="fas fa-print"></i>
-            Banque de Questions — Aperçu avant impression
+            Banque de Questions -Aperçu avant impression
         </div>
         <div class="ab-sub">
             <?= htmlspecialchars($type_label) ?>
             <?php if (!empty($filtres_actifs)): ?>
-            — <?= htmlspecialchars(implode(' · ', $filtres_actifs)) ?>
+            -<?= htmlspecialchars(implode(' · ', $filtres_actifs)) ?>
             <?php endif; ?>
         </div>
     </div>
@@ -601,7 +601,7 @@ body {
         <div class="doc-title-bar">
             <div class="doc-title">
                 <i class="fas fa-database" style="margin-right:8px;color:var(--gold);"></i>
-                Banque de Questions — EXASUR
+                Banque de Questions -EXASUR
             </div>
             <div class="doc-subtitle">
                 Questions Bank / AVSEC-FAL · ANAC GABON · Bilingue FR / EN
@@ -722,7 +722,7 @@ body {
             ?>
             <div class="section-hdr">
                 <i class="fas fa-shield-alt"></i>
-                <?= htmlspecialchars($tc.' — '.($q['type_nom']??'')) ?>
+                <?= htmlspecialchars($tc.' -'.($q['type_nom']??'')) ?>
                 <span class="shdr-count">
                     <?= $type_counter[$tc] ?> question<?= ($type_counter[$tc]>1)?'s':'' ?>
                 </span>
@@ -817,7 +817,7 @@ body {
                     Bonne réponse :
                 </span>
                 <span class="ak-badge">
-                    Option <?= $co ?> — <?= $LETTERS[$co-1] ?? '?' ?>
+                    Option <?= $co ?> -<?= $LETTERS[$co-1] ?? '?' ?>
                 </span>
                 <span class="ak-text">
                     FR : <?= htmlspecialchars(mb_substr($opts_fr[$co-1]??'—', 0, 80)) ?>
@@ -850,7 +850,7 @@ body {
                     <div class="opt-cell" style="grid-column:1/-1;<?= ($co!==1)?'':'background:var(--green-bg);' ?>">
                         <span class="opt-letter" style="<?= ($co===1)?'background:var(--green);color:#fff;':'' ?>">A</span>
                         <span class="opt-text" style="<?= ($co===1)?'color:#15803d;font-weight:700;':'' ?>">
-                            🟢 Bagage CLAIR — No prohibited item
+                            🟢 Bagage CLAIR -No prohibited item
                         </span>
                     </div>
                 </div>
@@ -858,7 +858,7 @@ body {
                     <div class="opt-cell" style="grid-column:1/-1;<?= ($co===1)?'':'background:var(--green-bg);' ?>">
                         <span class="opt-letter" style="<?= ($co!==1)?'background:var(--green);color:#fff;':'' ?>">B</span>
                         <span class="opt-text" style="<?= ($co!==1)?'color:#15803d;font-weight:700;':'' ?>">
-                            🔴 Bagage SUSPECT — Prohibited item detected
+                            🔴 Bagage SUSPECT -Prohibited item detected
                             <?php if ($co!==1 && !empty($q['option3_fr'])): ?>
                             <br><span style="font-size:.75rem;color:var(--blue);font-weight:600;margin-left:26px;">
                                 → <?= htmlspecialchars($q['option3_fr']) ?>
@@ -896,17 +896,17 @@ body {
 
     <!-- ── Pied de page ── -->
     <div class="doc-foot">
-        Document généré depuis le système <strong>EXASUR</strong> — ANAC GABON
+        Document généré depuis le système <strong>EXASUR</strong> -ANAC GABON
         le <?= date('d/m/Y à H:i') ?>
         &nbsp;·&nbsp;
         <strong><?= $total ?></strong> question<?= $total>1?'s':'' ?>
-        — <?= htmlspecialchars($type_label) ?>
+        -<?= htmlspecialchars($type_label) ?>
         <?php if (!empty($filtres_actifs)): ?>
         &nbsp;·&nbsp; <?= htmlspecialchars(implode(' · ', $filtres_actifs)) ?>
         <?php endif; ?>
         <br>
         <em>Direction de la Sûreté et de la Facilitation de l'Aviation Civile
-        · Document confidentiel — ANAC GABON</em>
+        · Document confidentiel -ANAC GABON</em>
     </div>
 
 </div><!-- /.doc -->

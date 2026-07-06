@@ -1,9 +1,9 @@
 <?php
 /**
- * fr.php — Fichier de traduction français EXASUR
- * Application : EXASUR — Examens de Sûreté de l'Aviation Civile
- * ANAC GABON — Direction de la Sûreté et de la Facilitation
- * Modifications : Renommage AIR SECURE → EXASUR, ECHEC→AJOURNÉ, RÉUSSITE→VALIDÉ
+ * fr.php- Fichier de traduction français EXASUR
+ * Application : EXASUR- Examens de Sûreté de l'Aviation Civile
+ * ANAC GABON- Direction de la Sûreté et de la Facilitation
+ * Modifications : Renommage EXASUR → EXASUR, ECHEC→AJOURNÉ, RÉUSSITE→VALIDÉ
  *                 Code accès 4 chiffres, suppression références PNSAC/OACI sur accueil
  */
 $lang = [
@@ -21,28 +21,28 @@ $lang = [
     'anglais'                       => 'English',
 
     // ── Page d'accueil ────────────────────────────────────────────────
-    'titre_accueil'                 => 'EXASUR — Plateforme d\'Examens de Sûreté de l\'Aviation Civile',
+    'titre_accueil'                 => 'EXASUR- Plateforme d\'Examens de Sûreté de l\'Aviation Civile',
     'sous_titre_accueil'            => 'Examens de Sûreté & Facilitation de l\'Aviation Civile en République Gabonaise',
     'description_accueil'           => 'Plateforme officielle d\'évaluation et de certification du personnel AVSEC-FAL de l\'ANAC GABON.',
     'consulter_note'                => 'Consulter ma note',
     'categories_personnel'          => 'Examens disponibles',
     'type_examen'                   => 'Type d\'examen',
-    'presentation_projet'           => 'EXASUR — Plateforme officielle d\'examens de sûreté aérienne',
+    'presentation_projet'           => 'EXASUR- Plateforme officielle d\'examens de sûreté aérienne',
 
     // ── Catégories ────────────────────────────────────────────────────
     'agent_surete'                  => 'Agent de Sûreté',
-    'agent_surete_desc'             => 'Certification des agents de sûreté aéroportuaire (50 QCM, seuil 70%)',
+    'agent_surete_desc'             => 'Certification des agents de sûreté aéroportuaire (100 QCM, 2h, seuil ≥ 70%)- Résultat confidentiel',
     'agent_if'                      => 'Agent Inspection Filtrage',
-    'agent_if_desc'                 => 'Certification théorique (50 QCM, seuil ≥70%) + pratique (images radiologiques, seuil 70% cumulé)',
+    'agent_if_desc'                 => 'Théorie : 100 QCM (2h, seuil ≥ 70%) + Pratique : images radiologiques (1h30, seuil cumulé ≥ 70%)- Résultat confidentiel',
     'instructeur'                   => 'Instructeur AVSEC',
-    'instructeur_desc'              => 'Certification des instructeurs en sûreté de l\'aviation (50 QCM, seuil 70%)',
+    'instructeur_desc'              => 'Certification des instructeurs en sûreté de l\'aviation (100 QCM, 2h, seuil ≥ 70%)- Résultat confidentiel',
     'sensibilisation'               => 'Sensibilisation Sûreté',
-    'sensibilisation_desc'          => 'Sensibilisation à la sûreté de l\'aviation civile (20 QCM, seuil 70%)',
+    'sensibilisation_desc'          => 'Sensibilisation à la sûreté de l\'aviation civile (20 QCM, 1h, seuil ≥ 70%)',
     'formation'                     => 'Évaluation de Formation',
     'formation_desc'                => 'Évaluation post-formation par modules avec pondération (seuil 70%)',
 
     // ── Caractéristiques ──────────────────────────────────────────────
-    'duree'                         => '1h30',
+    'duree'                         => '2h',
     'questions'                     => 'questions',
     'seuil'                         => 'seuil',
     'voir_instructions'             => 'Voir les instructions',
@@ -149,7 +149,7 @@ $lang = [
     'minutes_restantes_5'           => '5 MINUTES RESTANTES',
     'finalisez_reponses'            => 'Finalisez vos réponses rapidement !',
 
-    // ── Résultats — mentions VALIDÉ / AJOURNÉ ─────────────────────────
+    // ── Résultats- mentions VALIDÉ / AJOURNÉ ─────────────────────────
     'resultat_officiel'             => 'RÉSULTAT OFFICIEL',
     'bonnes_reponses'               => 'Bonnes réponses',
     'mauvaises_reponses'            => 'Mauvaises réponses',
@@ -171,7 +171,7 @@ $lang = [
     'deja_evalue'                   => 'Vous avez déjà donné votre avis.',
     'retour_accueil_bouton'         => 'RETOUR À L\'ACCUEIL',
     'imprimer'                      => 'IMPRIMER',
-    'document_officiel'             => 'Document officiel — Direction de la Sûreté et de la Facilitation',
+    'document_officiel'             => 'Document officiel- Direction de la Sûreté et de la Facilitation',
     'partie_theorique'              => 'Partie théorique',
     'partie_pratique'               => 'Partie pratique',
     'ok'                            => 'OK',
@@ -199,10 +199,10 @@ $lang = [
     'code_incorrect_ou_categorie'   => 'Code incorrect ou catégorie erronée.',
 
     // ── À propos EXASUR ───────────────────────────────────────────────
-    'apropos_titre'                 => 'EXASUR — Plateforme d\'Examens de Sûreté',
+    'apropos_titre'                 => 'EXASUR- Plateforme d\'Examens de Sûreté',
     'apropos_intro'                 => 'EXASUR est la plateforme officielle de l\'ANAC GABON dédiée aux examens de certification et d\'évaluation du personnel de sûreté et de facilitation de l\'aviation civile en République Gabonaise.',
     'apropos_objectif_titre'        => 'Objectif de la plateforme',
-    'apropos_objectif'              => 'Permettre aux agents AVSEC-FAL de passer leurs examens de certification en ligne, de manière sécurisée, transparente et automatisée — en remplacement du système manuel traditionnel.',
+    'apropos_objectif'              => 'Permettre aux agents AVSEC-FAL de passer leurs examens de certification en ligne, de manière sécurisée, transparente et automatisée- en remplacement du système manuel traditionnel.',
     'apropos_examens_titre'         => 'Examens disponibles',
     'apropos_securite_titre'        => 'Sécurité & Intégrité',
     'apropos_securite'              => 'Système anti-fraude intégré, surveillance active, verrouillage automatique des tentatives de triche, résultats immédiats et traçabilité complète.',

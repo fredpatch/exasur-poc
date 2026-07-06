@@ -1,7 +1,7 @@
 <?php
 /**
- * index.php — Page d'accueil EXASUR
- * ANAC GABON — Direction de la Sûreté et de la Facilitation
+ * index.php- Page d'accueil EXASUR
+ * ANAC GABON- Direction de la Sûreté et de la Facilitation
  * MODIFICATIONS : Seuil affiché 70% pour AS (type1), IF (type2), INST (type3)
  */
 session_start();
@@ -673,7 +673,7 @@ while ($row = $res_sess->fetch_assoc()) {
             <img src="ANAC/assets/images/Logo-ANAC-CERTIFICATION.png" alt="ANAC GABON" class="logo-img">
             <div class="logo-texts">
                 <div class="logo-title">EXASUR</div>
-                <div class="logo-sub">ANAC GABON — Direction de la Sûreté et de la Facilitation</div>
+                <div class="logo-sub">ANAC GABON- Direction de la Sûreté et de la Facilitation</div>
             </div>
         </a>
 
@@ -721,7 +721,7 @@ while ($row = $res_sess->fetch_assoc()) {
     <div class="hero-content">
         <div class="hero-badge">
             <i class="fas fa-shield-alt"></i>
-            <?php echo ($_SESSION['lang']=='fr') ? 'Plateforme officielle d\'Examens AVSEC-FAL — ANAC GABON' : 'Official AVSEC Exam Platform — ANAC GABON'; ?>
+            <?php echo ($_SESSION['lang']=='fr') ? 'Plateforme officielle d\'Examens AVSEC-FAL- ANAC GABON' : 'Official AVSEC Exam Platform- ANAC GABON'; ?>
         </div>
         <h1 class="hero-title">
             EXASUR
@@ -756,12 +756,12 @@ while ($row = $res_sess->fetch_assoc()) {
             <div class="stat-label"><?php echo ($_SESSION['lang']=='fr') ? 'Types d\'examen' : 'Exam types'; ?></div>
         </div>
         <div class="stat-item">
-            <div class="stat-num">70-80<span>%</span></div>
+            <div class="stat-num">70<span>%</span></div>
             <div class="stat-label"><?php echo ($_SESSION['lang']=='fr') ? 'Seuil de validation' : 'Pass threshold'; ?></div>
         </div>
         <div class="stat-item">
-            <div class="stat-num">50<span>Q</span></div>
-            <div class="stat-label"><?php echo ($_SESSION['lang']=='fr') ? 'Questions par épreuve' : 'Questions per exam'; ?></div>
+            <div class="stat-num">100<span>Q</span></div>
+            <div class="stat-label"><?php echo ($_SESSION['lang']=='fr') ? 'Questions max par épreuve' : 'Max questions per exam'; ?></div>
         </div>
         <div class="stat-item">
             <div class="stat-num">100<span>%</span></div>
@@ -769,7 +769,7 @@ while ($row = $res_sess->fetch_assoc()) {
         </div>
         <div class="stat-item">
             <div class="stat-num"><span>✈</span></div>
-            <div class="stat-label">AVSEC — FAL</div>
+            <div class="stat-label">AVSEC- FAL</div>
         </div>
     </div>
 </div>
@@ -803,9 +803,13 @@ while ($row = $res_sess->fetch_assoc()) {
                 $has_sess = $info['nb_sessions_actives'] > 0;
                 $link     = "ANAC/candidat/instructions.php?type={$idtype}";
 
-                // Durée affichée
-                if ($info['a_deux_parties'] && $info['code'] == 'IF') {
-                    $duree_str = '2h (Th.+Prat.)';
+                // ── Durée affichée (Directive DG) ─────────────────────────
+                if ($info['a_deux_parties'] && $info['code'] === 'IF') {
+                    $duree_str = '3h30 (2h Th. + 1h30 Prat.)';
+                } elseif (in_array($idtype, [1, 3])) {
+                    $duree_str = '2h'; // AS, INST
+                } elseif ($idtype == 4) {
+                    $duree_str = '1h'; // SENS
                 } else {
                     $dur = intval($info['duree_minutes']);
                     $duree_str = $dur >= 60 ? floor($dur/60).'h'.($dur%60?str_pad($dur%60,2,'0',STR_PAD_LEFT):'') : $dur.'min';
@@ -837,7 +841,7 @@ while ($row = $res_sess->fetch_assoc()) {
                         <div class="cat-name"><?php echo htmlspecialchars($info['nom_fr']); ?></div>
                         <div class="cat-desc">
                             <?php
-                            // Description par code — correspondance exacte avec les clés de fr.php
+                            // Description par code- correspondance exacte avec les clés de fr.php
                             $descs = [
                                 'AS'   => __('agent_surete_desc'),
                                 'IF'   => __('agent_if_desc'),
@@ -852,8 +856,12 @@ while ($row = $res_sess->fetch_assoc()) {
                             <span class="meta-tag"><i class="fas fa-clock"></i> <?php echo $duree_str; ?></span>
                             <?php if ($info['a_deux_parties'] && $info['code']=='IF'): ?>
                             <span class="meta-tag"><i class="fas fa-layer-group"></i> Th.+Prat.</span>
-                            <?php else: ?>
-                            <span class="meta-tag"><i class="fas fa-question-circle"></i> <?php echo $info['nb_questions_theorique']; ?> Q</span>
+                            <?php else:
+                                // Nb questions affiché selon directive DG
+                                $nb_q_affiche = in_array($idtype, [1,2,3]) ? 100
+                                    : intval($info['nb_questions_theorique']);
+                            ?>
+                            <span class="meta-tag"><i class="fas fa-question-circle"></i> <?php echo $nb_q_affiche; ?> Q</span>
                             <?php endif; ?>
                             <span class="meta-tag gold"><i class="fas fa-check-circle"></i> <?php echo $seuil_affiche; ?>%</span>
                             <?php echo $info_message; ?>
@@ -969,7 +977,7 @@ while ($row = $res_sess->fetch_assoc()) {
             <div>
                 <img src="ANAC/assets/images/Logo-ANAC-CERTIFICATION.png" alt="ANAC" class="footer-logo-img">
                 <div class="footer-brand">EXASUR</div>
-                <div class="footer-tagline">ANAC GABON —  Direction de la Sûreté et de la Facilitation</div>
+                <div class="footer-tagline">ANAC GABON-  Direction de la Sûreté et de la Facilitation</div>
                 <p class="footer-text">
                     BP 2212 · Libreville, Gabon<br>
                     <?php echo ($_SESSION['lang']=='fr') ? 'Zone aéroportuaire' : 'Airport zone'; ?>
@@ -991,11 +999,11 @@ while ($row = $res_sess->fetch_assoc()) {
             <div>
                 <div class="footer-heading"><?php echo ($_SESSION['lang']=='fr') ? 'Examens' : 'Exams'; ?></div>
                 <ul class="footer-links">
-                    <li><a href="ANAC/candidat/instructions.php?type=1">AS — <?php echo __('agent_surete'); ?></a></li>
-                    <li><a href="ANAC/candidat/instructions.php?type=2">IF — <?php echo __('agent_if'); ?></a></li>
-                    <li><a href="ANAC/candidat/instructions.php?type=3">INST — <?php echo __('instructeur'); ?></a></li>
-                    <li><a href="ANAC/candidat/instructions.php?type=4">SENS — <?php echo __('sensibilisation'); ?></a></li>
-                    <li><a href="ANAC/candidat/instructions.php?type=5">FORM — <?php echo __('formation'); ?></a></li>
+                    <li><a href="ANAC/candidat/instructions.php?type=1">AS- <?php echo __('agent_surete'); ?></a></li>
+                    <li><a href="ANAC/candidat/instructions.php?type=2">IF- <?php echo __('agent_if'); ?></a></li>
+                    <li><a href="ANAC/candidat/instructions.php?type=3">INST- <?php echo __('instructeur'); ?></a></li>
+                    <li><a href="ANAC/candidat/instructions.php?type=4">SENS- <?php echo __('sensibilisation'); ?></a></li>
+                    <li><a href="ANAC/candidat/instructions.php?type=5">FORM- <?php echo __('formation'); ?></a></li>
                 </ul>
             </div>
 
@@ -1038,7 +1046,7 @@ while ($row = $res_sess->fetch_assoc()) {
     <div class="modal-box">
         <div class="modal-header">
             <h5><i class="fas fa-info-circle" style="color:var(--gold);margin-right:10px;"></i>
-                <?php echo ($_SESSION['lang']=='fr') ? 'À propos — EXASUR' : 'About — EXASUR'; ?>
+                <?php echo ($_SESSION['lang']=='fr') ? 'À propos- EXASUR' : 'About- EXASUR'; ?>
             </h5>
             <button class="modal-close" onclick="closeModal('aboutModal')"><i class="fas fa-times"></i></button>
         </div>
@@ -1055,8 +1063,8 @@ while ($row = $res_sess->fetch_assoc()) {
                 <?php echo ($_SESSION['lang']=='fr') ? 'Objectif' : 'Purpose'; ?>
             </h6>
             <p><?php echo ($_SESSION['lang']=='fr')
-                ? 'Moderniser et automatiser le processus d\'évaluation du personnel AVSEC-FAL — en remplaçant le système manuel traditionnel par une solution numérique fiable, permettant aux agents de sûreté, agents d\'inspection filtrage, instructeurs et autres personnels de passer leurs examens de certification en ligne, en toute sécurité.'
-                : 'To modernize and automate the AVSEC-FAL personnel assessment process — replacing the traditional manual system with a reliable digital solution that allows security agents, inspection filtration agents, instructors and other personnel to take their certification exams online, securely.';
+                ? 'Moderniser et automatiser le processus d\'évaluation du personnel AVSEC-FAL- en remplaçant le système manuel traditionnel par une solution numérique fiable, permettant aux agents de sûreté, agents d\'inspection filtrage, instructeurs et autres personnels de passer leurs examens de certification en ligne, en toute sécurité.'
+                : 'To modernize and automate the AVSEC-FAL personnel assessment process- replacing the traditional manual system with a reliable digital solution that allows security agents, inspection filtration agents, instructors and other personnel to take their certification exams online, securely.';
             ?></p>
 
             <h6><i class="fas fa-list-check" style="color:var(--gold);"></i>
@@ -1064,19 +1072,19 @@ while ($row = $res_sess->fetch_assoc()) {
             </h6>
             <ul class="about-exam-list">
                 <li><i class="fas fa-shield-alt" style="color:var(--blue-light);margin-right:6px;"></i>
-                    AS — <?php echo __('agent_surete'); ?>
+                    AS- <?php echo __('agent_surete'); ?>
                 </li>
                 <li><i class="fas fa-search" style="color:#065f46;margin-right:6px;"></i>
-                    IF — <?php echo __('agent_if'); ?>
+                    IF- <?php echo __('agent_if'); ?>
                 </li>
                 <li><i class="fas fa-chalkboard-teacher" style="color:#92400e;margin-right:6px;"></i>
-                    INST — <?php echo __('instructeur'); ?>
+                    INST- <?php echo __('instructeur'); ?>
                 </li>
                 <li><i class="fas fa-exclamation-triangle" style="color:#5b21b6;margin-right:6px;"></i>
-                    SENS — <?php echo __('sensibilisation'); ?>
+                    SENS- <?php echo __('sensibilisation'); ?>
                 </li>
                 <li><i class="fas fa-graduation-cap" style="color:#9d174d;margin-right:6px;"></i>
-                    FORM — <?php echo __('formation'); ?>
+                    FORM- <?php echo __('formation'); ?>
                 </li>
             </ul>
 
@@ -1092,18 +1100,18 @@ while ($row = $res_sess->fetch_assoc()) {
                 <?php echo ($_SESSION['lang']=='fr') ? 'Mentions de résultat' : 'Result mentions'; ?>
             </h6>
             <p>
-                <strong style="color:#16a34a;">✅ VALIDÉ</strong> —
+                <strong style="color:#16a34a;">✅ VALIDÉ</strong>-
                 <?php echo ($_SESSION['lang']=='fr') ? 'Le candidat a atteint le seuil requis. Son examen est validé.' : 'The candidate has met the required threshold. Exam is validated.'; ?>
                 <br>
-                <strong style="color:#dc2626;">⛔ AJOURNÉ</strong> —
+                <strong style="color:#dc2626;">⛔ AJOURNÉ</strong>-
                 <?php echo ($_SESSION['lang']=='fr') ? 'Le candidat n\'a pas atteint le seuil. Il est ajourné et pourra repasser l\'examen.' : 'The candidate did not meet the threshold. They are deferred and may retake the exam.'; ?>
             </p>
 
             <p style="margin-top:16px;font-style:italic;color:var(--text-muted);font-size:0.82rem;">
                 <i class="fas fa-info-circle" style="margin-right:6px;color:var(--gold);"></i>
                 <?php echo ($_SESSION['lang']=='fr')
-                    ? 'Pour toute assistance technique ou question, contactez l\'administration ANAC GABON — Direction de la Sûreté et de la Facilitation.'
-                    : 'For any technical assistance or questions, contact ANAC GABON administration — Directorate of Security and Facilitation.'; ?>
+                    ? 'Pour toute assistance technique ou question, contactez l\'administration ANAC GABON- Direction de la Sûreté et de la Facilitation.'
+                    : 'For any technical assistance or questions, contact ANAC GABON administration- Directorate of Security and Facilitation.'; ?>
             </p>
         </div>
     </div>
@@ -1120,7 +1128,7 @@ while ($row = $res_sess->fetch_assoc()) {
         </div>
         <div class="modal-body">
             <h6><i class="fas fa-building" style="color:var(--gold);"></i> ANAC GABON</h6>
-            <p>BP 2212 — Libreville / Gabon<br>
+            <p>BP 2212- Libreville / Gabon<br>
             <?php echo ($_SESSION['lang']=='fr') ? 'Bureaux : Zone aéroportuaire' : 'Offices: Airport zone'; ?></p>
 
             <h6><i class="fas fa-phone" style="color:var(--gold);"></i> Téléphone</h6>
@@ -1192,8 +1200,8 @@ while ($row = $res_sess->fetch_assoc()) {
 
     /* ══════════════════════════════════════════════════════════
        CONSULTER MA NOTE
-       — Code 4 chiffres (codeserv AGFAC-DU)
-       — Filtre par date début/fin de session + type examen
+      - Code 4 chiffres (codeserv AGFAC-DU)
+      - Filtre par date début/fin de session + type examen
     ══════════════════════════════════════════════════════════ */
     function checkNote() {
         const lang = '<?php echo $_SESSION['lang']; ?>';
@@ -1225,11 +1233,11 @@ while ($row = $res_sess->fetch_assoc()) {
                         <select id="checkType" class="swal2-input"
                             style="width:100%;border-radius:12px;border:2px solid #e0e4ef;">
                             <option value="">${fr ? '-- Choisir le type --' : '-- Choose type --'}</option>
-                            <option value="1">AS — ${fr ? 'Agent de Sûreté' : 'Security Agent'}</option>
-                            <option value="2">IF — ${fr ? 'Agent Inspection Filtrage' : 'Inspection Filtration Agent'}</option>
-                            <option value="3">INST — ${fr ? 'Instructeur AVSEC' : 'AVSEC Instructor'}</option>
-                            <option value="4">SENS — ${fr ? 'Sensibilisation Sûreté' : 'Security Awareness'}</option>
-                            <option value="5">FORM — ${fr ? 'Évaluation de Formation' : 'Training Assessment'}</option>
+                            <option value="1">AS- ${fr ? 'Agent de Sûreté' : 'Security Agent'}</option>
+                            <option value="2">IF- ${fr ? 'Agent Inspection Filtrage' : 'Inspection Filtration Agent'}</option>
+                            <option value="3">INST- ${fr ? 'Instructeur AVSEC' : 'AVSEC Instructor'}</option>
+                            <option value="4">SENS- ${fr ? 'Sensibilisation Sûreté' : 'Security Awareness'}</option>
+                            <option value="5">FORM- ${fr ? 'Évaluation de Formation' : 'Training Assessment'}</option>
                         </select>
                     </div>
 

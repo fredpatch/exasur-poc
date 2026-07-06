@@ -1,6 +1,6 @@
 <?php
 /**
- * candidats.php v6 — EXASUR ANAC GABON
+ * candidats.php v6 -EXASUR ANAC GABON
  * ────────────────────────────────────────
  * CORRECTIONS v6 :
  *  ① Filtre dates AGFAC STRICT :
@@ -31,9 +31,16 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action']??'')==='import_agfa
         $idtypeforma   = intval($row['idtypeforma']);
         $nomforma      = $conn->real_escape_string($row['nomforma']);
         $code_type     = $conn->real_escape_string($row['code']);
-        $nom_sess      = $code_type.' — '.$nomforma.' — '.date('d/m/Y',strtotime($date_debut));
+        $nom_sess      = $code_type.' - '.$nomforma.' - '.date('d/m/Y',strtotime($date_debut));
         $type_session  = ($idtype_examen==2)?'theorie':'normal';
-        $duree         = match($idtype_examen){2=>60,4=>60,default=>90};
+        // Durées corrigées directive DG : AS/INST=120min, IF théorie=120min, IF pratique=90min, SENS=60min
+        $duree = match($idtype_examen){
+            1 => 120,   // AS
+            2 => 120,   // IF théorie
+            3 => 120,   // INST
+            4 => 60,    // SENS
+            default => 90
+        };
         $mdp_plain     = genMdp(9);
         $mdp_hash      = password_hash($mdp_plain, PASSWORD_DEFAULT);
         /* Code = codeserv AGFAC */
@@ -56,24 +63,51 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action']??'')==='import_agfa
             $idcandidat=$conn->insert_id;$ic->close();
             $statut_imp='Nouveau';$nb_new++;
         }
-        /* Session */
+
+        // ── Tiret court "-" (tiret du 6) dans les noms de session ────────────
+        $nom_sess = $code_type.' - '.$nomforma.' - '.date('d/m/Y',strtotime($date_debut));
+
+        /* ── Session THÉORIE (ou normale pour AS/INST/SENS) ── */
         $cs=$conn->prepare("SELECT id_session FROM session_examen WHERE idtype_examen=? AND idtypeformation=? AND date_debut=? AND type_session=? LIMIT 1");
         $cs->bind_param("iiss",$idtype_examen,$idtypeforma,$date_debut,$type_session);
         $cs->execute();$exs=$cs->get_result()->fetch_assoc();$cs->close();
-        if($exs){$id_session=$exs['id_session'];}
-        else{
+        if($exs){
+            $id_session=$exs['id_session'];
+        } else {
             $ins=$conn->prepare("INSERT INTO session_examen (nom_session,idtype_examen,idtypeformation,type_session,date_debut,date_fin,duree_minutes,statut) VALUES (?,?,?,?,?,?,?,'planifiee')");
             $ins->bind_param("siisssi",$nom_sess,$idtype_examen,$idtypeforma,$type_session,$date_debut,$date_fin,$duree);
             $ins->execute();$id_session=$conn->insert_id;$ins->close();$nb_s++;
-            if($idtype_examen==2){
-                $n2='IF — Pratique — '.$nomforma.' — '.date('d/m/Y',strtotime($date_debut));$tp='pratique';
-                $ip=$conn->prepare("INSERT INTO session_examen (nom_session,idtype_examen,idtypeformation,type_session,date_debut,date_fin,duree_minutes,statut) VALUES (?,?,?,?,?,?,60,'planifiee')");
-                $ip->bind_param("siisss",$n2,$idtype_examen,$idtypeforma,$tp,$date_debut,$date_fin);
-                $ip->execute();$idp=$conn->insert_id;$ip->close();
-                $conn->query("INSERT IGNORE INTO candidat_session (idcandidat,id_session,habilite) VALUES ($idcandidat,$idp,1)");
-            }
         }
+        // Ajouter ce candidat à la session théorie
         $conn->query("INSERT IGNORE INTO candidat_session (idcandidat,id_session,habilite) VALUES ($idcandidat,$id_session,1)");
+
+        /* ── SESSION IF PRATIQUE : créer si nécessaire ET ajouter TOUS les candidats ──
+           BUG CORRIGÉ : la session pratique était créée lors du 1er candidat seulement.
+           Désormais, pour CHAQUE candidat IF, on cherche la session pratique existante
+           (ou on la crée) et on l'y inscrit systématiquement.
+        ── */
+        if($idtype_examen==2){
+            $n2 = 'IF - Pratique - '.$nomforma.' - '.date('d/m/Y',strtotime($date_debut));
+            $tp = 'pratique';
+            $dur_prat = 90; // 1h30 -directive DG
+
+            // Chercher la session pratique existante pour cette formation/date
+            $cp=$conn->prepare("SELECT id_session FROM session_examen WHERE idtype_examen=? AND idtypeformation=? AND date_debut=? AND type_session='pratique' LIMIT 1");
+            $cp->bind_param("iis",$idtype_examen,$idtypeforma,$date_debut);
+            $cp->execute();$exp=$cp->get_result()->fetch_assoc();$cp->close();
+
+            if($exp){
+                // Session pratique déjà existante → juste inscrire le candidat
+                $idp=$exp['id_session'];
+            } else {
+                // Créer la session pratique
+                $ip=$conn->prepare("INSERT INTO session_examen (nom_session,idtype_examen,idtypeformation,type_session,date_debut,date_fin,duree_minutes,statut) VALUES (?,?,?,?,?,?,?,'planifiee')");
+                $ip->bind_param("siisssi",$n2,$idtype_examen,$idtypeforma,$tp,$date_debut,$date_fin,$dur_prat);
+                $ip->execute();$idp=$conn->insert_id;$ip->close();$nb_s++;
+            }
+            // Inscrire le candidat à la pratique (IGNORE si déjà inscrit)
+            $conn->query("INSERT IGNORE INTO candidat_session (idcandidat,id_session,habilite) VALUES ($idcandidat,$idp,1)");
+        }
         $sn=$conn->query("SELECT nomstagiaire,prenomstagiaire FROM si_anac.stagiaire WHERE idstagiaire=$idstagiaire")->fetch_assoc();
         $export_rows[]=['nom'=>($sn['nomstagiaire']??'').' '.($sn['prenomstagiaire']??''),'code'=>$code,'mdp'=>$mdp_plain,'type'=>$code_type,'session'=>$nom_sess,'dates'=>date('d/m/Y',strtotime($date_debut)).' au '.date('d/m/Y',strtotime($date_fin)),'statut'=>$statut_imp];
     }
@@ -143,7 +177,7 @@ if($filtre_soumis){
             /* Type examen : égalité exacte */
             if($f_type && $ag['code']!==$f_type) continue;
             /*
-             * CORRECTION V6 — Dates STRICTEMENT ÉGALES :
+             * CORRECTION V6 -Dates STRICTEMENT ÉGALES :
              * On veut UNIQUEMENT les stagiaires dont la session a
              * datedebusession = f_deb ET datefinsession = f_fin.
              * Avant (bug) : f_deb <= date_debut ET f_fin >= date_fin
@@ -190,7 +224,7 @@ $active_page='candidats';
 <html lang="fr">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Candidats — EXASUR ANAC</title>
+<title>Candidats -EXASUR ANAC</title>
 <link rel="icon" href="../assets/images/faviconLOGOANAC.ico">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -236,7 +270,7 @@ $active_page='candidats';
 .b-new{background:#86efac;color:#14532d;padding:2px 8px;border-radius:50px;font-weight:700;font-size:.72rem;}
 .b-rst{background:#fde68a;color:#92400e;padding:2px 8px;border-radius:50px;font-weight:700;font-size:.72rem;}
 
-/* Barre recherche AGFAC — ergonomie v6 */
+/* Barre recherche AGFAC -ergonomie v6 */
 .search-card{background:#fff;border-radius:16px;padding:18px 20px;margin-bottom:16px;box-shadow:0 2px 14px rgba(3,34,76,.08);border:1.5px solid #e0e7f0;}
 .search-card h6{color:var(--blue);font-weight:800;font-size:.93rem;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
 /* Barre de filtres inline */
@@ -279,7 +313,7 @@ $active_page='candidats';
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-wrap:wrap;">
         <div style="width:48px;height:48px;background:var(--gold);color:var(--blue);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;"><i class="fas fa-file-word"></i></div>
         <div>
-            <h5 style="margin:0;font-weight:800;font-size:1rem;">✅ <?= count($export_rows) ?> candidat(s) traité(s) — Accès à communiquer</h5>
+            <h5 style="margin:0;font-weight:800;font-size:1rem;">✅ <?= count($export_rows) ?> candidat(s) traité(s) -Accès à communiquer</h5>
             <p style="margin:0;opacity:.75;font-size:.84rem;"><?= $import_result['new']??0 ?> nouveau(x) · <?= $import_result['reset']??0 ?> réinitialisé(s) · <?= $import_result['sessions']??0 ?> session(s)</p>
         </div>
         <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
@@ -304,7 +338,7 @@ $active_page='candidats';
             </tbody>
         </table>
     </div>
-    <p style="margin-top:8px;opacity:.5;font-size:.75rem;"><i class="fas fa-exclamation-circle me-1"></i>Mots de passe affichés une seule fois — conservez ce document.</p>
+    <p style="margin-top:8px;opacity:.5;font-size:.75rem;"><i class="fas fa-exclamation-circle me-1"></i>Mots de passe affichés une seule fois -conservez ce document.</p>
 </div>
 <?php endif; ?>
 
@@ -416,12 +450,12 @@ $active_page='candidats';
                 <div class="fg" style="max-width:175px;">
                     <span class="fl"><i class="fas fa-tag me-1"></i>Type d'examen</span>
                     <select name="f_type" class="fi" id="f_type">
-                        <option value="">— Tous types —</option>
-                        <option value="AS"   <?= ($_GET['f_type']??'')==='AS'  ?'selected':'' ?>>🔵 AS — Agent Sûreté</option>
-                        <option value="IF"   <?= ($_GET['f_type']??'')==='IF'  ?'selected':'' ?>>🟢 IF — Inspection Filtrage</option>
-                        <option value="INST" <?= ($_GET['f_type']??'')==='INST'?'selected':'' ?>>🟡 INST — Instructeur</option>
-                        <option value="SENS" <?= ($_GET['f_type']??'')==='SENS'?'selected':'' ?>>🟣 SENS — Sensibilisation</option>
-                        <option value="FORM" <?= ($_GET['f_type']??'')==='FORM'?'selected':'' ?>>🔴 FORM — Formation</option>
+                        <option value="">-Tous types —</option>
+                        <option value="AS"   <?= ($_GET['f_type']??'')==='AS'  ?'selected':'' ?>>🔵 AS -Agent Sûreté</option>
+                        <option value="IF"   <?= ($_GET['f_type']??'')==='IF'  ?'selected':'' ?>>🟢 IF -Inspection Filtrage</option>
+                        <option value="INST" <?= ($_GET['f_type']??'')==='INST'?'selected':'' ?>>🟡 INST -Instructeur</option>
+                        <option value="SENS" <?= ($_GET['f_type']??'')==='SENS'?'selected':'' ?>>🟣 SENS -Sensibilisation</option>
+                        <option value="FORM" <?= ($_GET['f_type']??'')==='FORM'?'selected':'' ?>>🔴 FORM -Formation</option>
                     </select>
                 </div>
 
@@ -600,7 +634,7 @@ function confirmImport(){
 
 /* Export */
 function copyTable(){const tbl=document.getElementById('expTbl');if(!tbl)return;const rng=document.createRange();rng.selectNode(tbl);window.getSelection().removeAllRanges();window.getSelection().addRange(rng);document.execCommand('copy');window.getSelection().removeAllRanges();Swal.fire({title:'✅ Copié !',text:'Collez dans Word avec Ctrl+V.',icon:'success',timer:2500,showConfirmButton:false,position:'top-end',toast:true});}
-function printExport(){const h=document.getElementById('expWrap')?.innerHTML||'';const w=window.open('','_blank');w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Accès candidats ANAC</title><style>body{font-family:Candara,sans-serif;padding:28px;}h2{color:#03224c;}table{width:100%;border-collapse:collapse;}th{background:#03224c;color:#D4AF37;padding:8px 11px;text-align:left;}td{border:1px solid #ddd;padding:7px 10px;}tr:nth-child(even) td{background:#f8f9fa;}.foot{margin-top:20px;color:#9ca3af;font-size:.75rem;text-align:center;border-top:1px solid #eee;padding-top:10px;}</style></head><body><h2>🇬🇦 ANAC GABON — Codes d'accès candidats</h2><p style="color:#6b7280;font-size:.86rem;">Généré le <?= date('d/m/Y à H:i') ?> — Document CONFIDENTIEL</p>${h}<div class="foot">© <?= date('Y') ?> ANAC GABON | EXASUR</div></body></html>`);w.document.close();setTimeout(()=>w.print(),600);}
+function printExport(){const h=document.getElementById('expWrap')?.innerHTML||'';const w=window.open('','_blank');w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Accès candidats ANAC</title><style>body{font-family:Candara,sans-serif;padding:28px;}h2{color:#03224c;}table{width:100%;border-collapse:collapse;}th{background:#03224c;color:#D4AF37;padding:8px 11px;text-align:left;}td{border:1px solid #ddd;padding:7px 10px;}tr:nth-child(even) td{background:#f8f9fa;}.foot{margin-top:20px;color:#9ca3af;font-size:.75rem;text-align:center;border-top:1px solid #eee;padding-top:10px;}</style></head><body><h2>EXASUR ANAC GABON -Codes d'accès candidats</h2><p style="color:#6b7280;font-size:.86rem;">Généré le <?= date('d/m/Y à H:i') ?> -Document CONFIDENTIEL</p>${h}<div class="foot">© <?= date('Y') ?> ANAC GABON | EXASUR</div></body></html>`);w.document.close();setTimeout(()=>w.print(),600);}
 
 /* Notification import réussi */
 <?php if(isset($_GET['imported'])&&$import_result): ?>

@@ -1,6 +1,6 @@
 <?php
 /**
- * print_organisme.php — Rapport d'une entité/organisme
+ * print_organisme.php -Rapport d'une entité/organisme
  * BDD : quiz_app_du + si_anac
  * 
  * SEUIL UNIQUE : Score ≥ 70% = RÉUSSI / VALIDÉ
@@ -79,7 +79,7 @@ $taux = $total_examens > 0 ? round($total_reussites / $total_examens * 100, 1) :
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>Rapport — <?= htmlspecialchars($orga['nomorga']) ?></title>
+<title>Rapport -<?= htmlspecialchars($orga['nomorga']) ?></title>
 <link rel="icon" href="../assets/images/faviconLOGOANAC.ico">
 <style>
 *{font-family:'Candara',Arial,sans-serif;box-sizing:border-box;margin:0;padding:0;}
@@ -403,7 +403,7 @@ tbody td{padding:7px 10px;font-size:12px;vertical-align:middle;}
     <div>
       <img src="../assets/images/Logo-ANAC-CERTIFICATION.png" alt="ANAC"
            style="height:28px;vertical-align:middle;margin-right:8px" onerror="this.style.display='none'">
-      <strong style="color:#03224c">ANAC GABON</strong> — Système EXASUR
+      <strong style="color:#03224c">ANAC GABON</strong> -Système EXASUR
     </div>
     <div>Rapport généré le <?= date('d/m/Y à H:i') ?></div>
     <div style="font-size:10px;color:#9ca3af">Confidentiel</div>

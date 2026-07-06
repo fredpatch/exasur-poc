@@ -1,7 +1,7 @@
 <?php
 /**
- * evaluations.php — Gestion des évaluations candidats EXASUR
- * ANAC GABON — Direction de la Sûreté et de la Facilitation
+ * evaluations.php- Gestion des évaluations candidats EXASUR
+ * ANAC GABON- Direction de la Sûreté et de la Facilitation
  *
  * Filtres disponibles (tous côté SERVEUR, impactent les statistiques) :
  *  ① Recherche texte (nom/prénom candidat)
@@ -95,7 +95,7 @@ $evaluations = $conn->query("
 ");
 
 /* ══════════════════════════════════════════════════════════════
-   STATISTIQUES — calculées sur la MÊME clause WHERE
+   STATISTIQUES- calculées sur la MÊME clause WHERE
    → Les KPIs reflètent exactement le filtre actif
 ══════════════════════════════════════════════════════════════ */
 $stat_total = intval($conn->query("SELECT COUNT(*) $base_join $w")->fetch_row()[0]);
@@ -146,7 +146,7 @@ $active_page = 'evaluations';
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Évaluations — EXASUR ANAC</title>
+<title>Évaluations- EXASUR ANAC</title>
 <link rel="icon" href="../assets/images/faviconLOGOANAC.ico">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -279,7 +279,7 @@ $active_page = 'evaluations';
 <div class="admin-topbar">
   <button class="sidebar-toggle" id="st"><i class="fas fa-bars"></i></button>
   <div class="topbar-title">
-    <i class="fas fa-star"></i> Évaluations candidats — EXASUR
+    <i class="fas fa-star"></i> Évaluations candidats- EXASUR
     <?php if ($is_filtered): ?>
     <span class="filter-active-badge ms-2">
       <i class="fas fa-filter"></i>
@@ -304,7 +304,7 @@ $active_page = 'evaluations';
 <div class="admin-content">
 
 <!-- ══════════════════════════════════════════════════════════
-     KPIs — Calculés sur la même clause WHERE que le filtre
+     KPIs- Calculés sur la même clause WHERE que le filtre
 ══════════════════════════════════════════════════════════ -->
 <div class="d-flex gap-3 mb-4 flex-wrap">
 
@@ -561,7 +561,7 @@ $active_page = 'evaluations';
           <?php foreach ($types_arr as $t): ?>
           <option value="<?= $t['idtype_examen'] ?>"
                   <?= $f_type == $t['idtype_examen'] ? 'selected' : '' ?>>
-            <?= $t['code'] ?> — <?= htmlspecialchars($t['nom_fr']) ?>
+            <?= $t['code'] ?>- <?= htmlspecialchars($t['nom_fr']) ?>
           </option>
           <?php endforeach; ?>
         </select>
@@ -734,7 +734,7 @@ document.getElementById('st').addEventListener('click', () =>
     document.getElementById('adminSidebar').classList.toggle('open'));
 
 /* ══════════════════════════════════════════════════════════
-   GRAPHIQUE DONUT — Chart.js
+   GRAPHIQUE DONUT- Chart.js
    Données calculées côté PHP avec le même filtre actif
 ══════════════════════════════════════════════════════════ */
 <?php if ($stat_total > 0): ?>
@@ -775,7 +775,7 @@ document.getElementById('st').addEventListener('click', () =>
 <?php endif; ?>
 
 /* ══════════════════════════════════════════════════════════
-   FILTRES — Application (rechargement serveur)
+   FILTRES- Application (rechargement serveur)
    Tous les filtres passent par GET → les stats PHP sont
    recalculées sur la même clause WHERE
 ══════════════════════════════════════════════════════════ */

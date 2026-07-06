@@ -1,6 +1,6 @@
 <?php
 /**
- * sessions.php — Gestion sessions d'examen EXASUR ANAC
+ * sessions.php - Gestion sessions d'examen EXASUR ANAC
  * admin/sessions.php
  *
  * ⚠️  LE FORMULAIRE "CRÉER UNE SESSION D'ÉVALUATION" EST RÉSERVÉ AU TYPE FORM.
@@ -201,7 +201,7 @@ $active_page = 'sessions';
 <html lang="fr">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sessions — EXASUR ANAC</title>
+<title>Sessions - EXASUR ANAC</title>
 <link rel="icon" href="../assets/images/faviconLOGOANAC.ico">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -255,6 +255,29 @@ $active_page = 'sessions';
 .accordion-toggle .fa-minus-circle {
     font-size: 1.1rem;
 }
+/* Bouton quand 0 module : orange pulsant pour attirer l'attention */
+.accordion-toggle.accordion-empty {
+    background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+    animation: pulse-empty 2s ease-in-out infinite;
+}
+.accordion-toggle.accordion-empty:hover {
+    background: linear-gradient(135deg, #d97706, #b45309) !important;
+    transform: scale(1.15);
+}
+.accordion-toggle.accordion-empty .fa-exclamation-circle {
+    font-size: 1rem;
+    color: white;
+}
+@keyframes pulse-empty {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,.5); }
+    50%       { box-shadow: 0 0 0 6px rgba(245,158,11,0); }
+}
+/* SweetAlert2 guide FORM */
+.swal2-popup.swal-form-guide {
+    max-width: 520px !important;
+    font-family: Candara, Calibri, sans-serif !important;
+    border-top: 4px solid #03224c !important;
+}
 .container-row .accordion-toggle:hover {
     opacity: 0.7;
 }
@@ -292,7 +315,7 @@ $active_page = 'sessions';
 <div class="card-admin mb-4" style="border-left:4px solid #16a34a;">
     <div class="card-admin-header" style="background:linear-gradient(135deg,var(--blue),var(--blue-mid));">
         <i class="fas fa-key me-2" style="color:var(--gold)"></i>
-        <h5 style="color:#fff;">Codes d'accès &amp; mots de passe — À distribuer aux candidats</h5>
+        <h5 style="color:#fff;">Codes d'accès &amp; mots de passe - À distribuer aux candidats</h5>
         <div class="ms-auto d-flex gap-2 no-print">
             <button onclick="copierTableau()" style="background:var(--gold);color:var(--blue);border:none;border-radius:50px;padding:5px 14px;font-weight:700;font-size:.78rem;cursor:pointer;">
                 <i class="fas fa-copy me-1"></i>Copier Word
@@ -305,11 +328,11 @@ $active_page = 'sessions';
     <div class="card-admin-body p-0">
         <div style="padding:14px 18px;background:#f0fdf4;border-bottom:1px solid #bbf7d0;">
             <div style="font-weight:700;color:#166534;font-size:.9rem;">
-                <i class="fas fa-check-circle me-1"></i>ANAC GABON — EXASUR
+                <i class="fas fa-check-circle me-1"></i>ANAC GABON - EXASUR
             </div>
             <div style="font-size:.8rem;color:#166534;margin-top:3px;">
-                <?= count($export_rows) ?> candidat(s) — Session créée avec succès
-                <?php if($new_sid): ?> — ID #<?= $new_sid ?><?php endif; ?>
+                <?= count($export_rows) ?> candidat(s) - Session créée avec succès
+                <?php if($new_sid): ?> - ID #<?= $new_sid ?><?php endif; ?>
             </div>
         </div>
         <div style="padding:16px;overflow-x:auto;">
@@ -346,10 +369,10 @@ $active_page = 'sessions';
             </div>
             <div style="font-size:.82rem;color:#831843;line-height:1.8;">
                 <strong>Ce formulaire crée une session d'évaluation par module</strong>, à partir d'une session de formation importée depuis AGFAC-DU.<br>
-                <strong>1.</strong> Sélectionnez la <strong>session de formation source</strong> (importée depuis AGFAC-DU — contient vos stagiaires).<br>
+                <strong>1.</strong> Sélectionnez la <strong>session de formation source</strong> (importée depuis AGFAC-DU - contient vos stagiaires).<br>
                 <strong>2.</strong> Choisissez le <strong>module à évaluer</strong> parmi ceux évaluables (2, 3, 4, 6, 8, 9).<br>
                 <strong>3.</strong> <strong>Cochez les stagiaires</strong> qui passent ce module.<br>
-                <strong>4.</strong> Saisissez les <strong>dates de l'évaluation</strong> — différentes des dates de formation.<br>
+                <strong>4.</strong> Saisissez les <strong>dates de l'évaluation</strong> - différentes des dates de formation.<br>
                 <strong>5.</strong> Cliquez <strong>Créer</strong> → session créée, tableau codes+mots de passe généré.<br>
                 <br>
                 <i class="fas fa-lightbulb" style="color:var(--gold);"></i>
@@ -409,9 +432,9 @@ $active_page = 'sessions';
                         <span style="background:var(--blue);color:#fff;padding:2px 8px;border-radius:50px;font-size:.7rem;margin-right:5px;">3</span>
                         Nom de la session d'évaluation *
                     </label>
-                    <input type="text" name="nom_session" id="inpNom" class="form-control-admin" required placeholder="Ex: FORM — Module 3 — Sûreté Avancée — Avr.2026">
+                    <input type="text" name="nom_session" id="inpNom" class="form-control-admin" required placeholder="Ex: FORM - Module 3 - Sûreté Avancée - Avr.2026">
                     <div style="font-size:.72rem;color:#9ca3af;margin-top:3px;">
-                        <i class="fas fa-magic me-1" style="color:var(--gold);"></i>Auto-généré — vous pouvez le modifier
+                        <i class="fas fa-magic me-1" style="color:var(--gold);"></i>Auto-généré - vous pouvez le modifier
                     </div>
                 </div>
                 <div class="col-12 d-none" id="colDates">
@@ -586,17 +609,55 @@ $active_page = 'sessions';
                 se.id_session DESC
         ");
 
-        $non_form = [];
-        $form_conteneurs = [];
-        $form_modules    = [];
+        $non_form        = [];
+        $form_conteneurs = [];  // clé = id_session du conteneur
+        $form_modules    = [];  // clé = id_session du conteneur
 
-        if($all_sessions) while($ss=$all_sessions->fetch_assoc()) {
+        $all_rows = [];
+        if($all_sessions) while($ss=$all_sessions->fetch_assoc()) $all_rows[] = $ss;
+
+        /* 1. Séparer conteneurs (idmodule IS NULL) et modules (idmodule NOT NULL) */
+        $raw_conteneurs = [];
+        $raw_modules    = [];
+        foreach ($all_rows as $ss) {
             if ($ss['tc'] !== 'FORM') {
                 $non_form[] = $ss;
             } elseif ($ss['idmodule'] === null) {
-                $form_conteneurs[$ss['idtypeformation']] = $ss;
+                $raw_conteneurs[] = $ss;
+                $form_conteneurs[$ss['id_session']] = $ss;
             } else {
-                $form_modules[$ss['idtypeformation']][] = $ss;
+                $raw_modules[] = $ss;
+            }
+        }
+
+        /* 2. Rattacher chaque module à son conteneur
+           Stratégie : même idtypeformation + dates les plus proches
+           (les modules sont créés depuis un conteneur, leurs dates sont souvent identiques
+            ou encadrées par celles du conteneur) */
+        foreach ($raw_modules as $mod) {
+            $best_sid  = null;
+            $best_diff = PHP_INT_MAX;
+            $mod_deb   = strtotime($mod['date_debut']);
+            $mod_fin   = strtotime($mod['date_fin']);
+
+            foreach ($raw_conteneurs as $c) {
+                if ($c['idtypeformation'] != $mod['idtypeformation']) continue;
+
+                /* Score = différence absolue de dates (priorité : même dates = 0) */
+                $diff = abs(strtotime($c['date_debut']) - $mod_deb)
+                      + abs(strtotime($c['date_fin'])   - $mod_fin);
+
+                if ($diff < $best_diff) {
+                    $best_diff = $diff;
+                    $best_sid  = $c['id_session'];
+                }
+            }
+
+            if ($best_sid !== null) {
+                $form_modules[$best_sid][] = $mod;
+            } else {
+                /* Module sans conteneur connu */
+                $form_modules['orphan'][] = $mod;
             }
         }
         ?>
@@ -636,7 +697,7 @@ $active_page = 'sessions';
                     <span style="font-size:.72rem;background:#fce7f3;color:#9d174d;padding:2px 8px;border-radius:20px;">🖼️ Pratique</span>
                     <?php else: ?><span style="font-size:.75rem;color:#9ca3af;">Normal</span><?php endif; ?>
                 </td>
-                <td style="font-size:.8rem;color:#9ca3af;">—</td>
+                <td style="font-size:.8rem;color:#9ca3af;">-</td>
                 <td style="font-size:.8rem;white-space:nowrap;">
                     <?= date('d/m/Y',strtotime($ss['date_debut'])) ?><br>
                     <span style="color:#9ca3af;">→ <?= date('d/m/Y',strtotime($ss['date_fin'])) ?></span>
@@ -663,16 +724,11 @@ $active_page = 'sessions';
             <?php endforeach; ?>
 
             <?php
-            $itfs_all = array_unique(array_merge(
-                array_keys($form_conteneurs),
-                array_keys($form_modules)
-            ));
-            sort($itfs_all);
-
-            foreach($itfs_all as $itf):
-                $cont   = $form_conteneurs[$itf] ?? null;
-                $mods   = $form_modules[$itf]    ?? [];
-                $nb_mods= count($mods);
+            /* Maintenant form_conteneurs est indexé par id_session
+               donc on itère directement dessus */
+            foreach($form_conteneurs as $sid_cont => $cont):
+                $mods    = $form_modules[$sid_cont] ?? [];
+                $nb_mods = count($mods);
 
                 if ($cont): ?>
             <tr data-type="FORM" data-statut="<?= $cont['statut'] ?>"
@@ -682,8 +738,11 @@ $active_page = 'sessions';
                 style="background:linear-gradient(135deg,#fdf4ff,#fce7f3);">
                 <td colspan="10" style="padding:10px 14px;">
                     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                        <button type="button" class="accordion-toggle" data-container="container-<?= $cont['id_session'] ?>">
-                            <i class="fas fa-plus-circle"></i>
+                        <button type="button" class="accordion-toggle <?= $nb_mods === 0 ? 'accordion-empty' : '' ?>"
+                                data-container="container-<?= $cont['id_session'] ?>"
+                                data-nb-mods="<?= $nb_mods ?>"
+                                title="<?= $nb_mods === 0 ? 'Aucun module évalué - cliquez pour savoir comment en créer un' : 'Voir les '.$nb_mods.' module(s) évalué(s)' ?>">
+                            <i class="fas <?= $nb_mods === 0 ? 'fa-exclamation-circle' : 'fa-plus-circle' ?>"></i>
                         </button>
                         <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
                             <div style="background:#9d174d;color:#fff;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
@@ -709,7 +768,7 @@ $active_page = 'sessions';
                             </span>
                             <span class="badge-status badge-<?= $cont['statut'] ?>"><?= ucfirst($cont['statut']) ?></span>
                             <span style="background:#fce7f3;color:#9d174d;border:1px solid #f9a8d4;padding:2px 9px;border-radius:50px;font-size:.7rem;font-weight:600;font-style:italic;">
-                                <i class="fas fa-info-circle me-1"></i>Source — non évalué directement
+                                <i class="fas fa-info-circle me-1"></i>Source - non évalué directement
                             </span>
                         </div>
                     </div>
@@ -743,7 +802,7 @@ $active_page = 'sessions';
                         <?= $mod['numero_module'] ?>
                     </span>
                     <?= htmlspecialchars(mb_substr($mod['nom_module_fr'],0,28)) ?>
-                    <?php else: ?><span style="color:#9ca3af;">—</span><?php endif; ?>
+                    <?php else: ?><span style="color:#9ca3af;">-</span><?php endif; ?>
                 </td>
                 <td style="font-size:.8rem;white-space:nowrap;">
                     <?= date('d/m/Y',strtotime($mod['date_debut'])) ?><br>
@@ -780,11 +839,23 @@ $active_page = 'sessions';
             <tr style="background:#fff8e1;">
                 <td colspan="10" style="padding:8px 14px;font-size:.8rem;color:#92400e;">
                     <i class="fas fa-exclamation-triangle me-1"></i>
-                    <strong>Modules sans session de formation source</strong> — formation ID <?= $itf ?>
+                    <strong>Modules sans session de formation source</strong>
                 </td>
             </tr>
                 <?php endif;
-            endforeach; ?>
+            endforeach;
+
+            /* Afficher les modules orphelins s'il y en a */
+            if (!empty($form_modules['orphan'])): ?>
+            <tr style="background:#fff8e1;">
+                <td colspan="10" style="padding:8px 14px;font-size:.8rem;color:#92400e;">
+                    <i class="fas fa-exclamation-triangle me-1"></i>
+                    <strong>Modules d'évaluation sans formation source détectée</strong> -
+                    <?= count($form_modules['orphan']) ?> module(s).
+                    Vérifiez que la session de formation parente existe.
+                </td>
+            </tr>
+            <?php endif; ?>
 
             </tbody>
         </table>
@@ -830,7 +901,7 @@ function chargerSessionsFORM(){
         }
         data.forEach(function(s){
             const deb=fmtDate(s.date_debut), fin=fmtDate(s.date_fin);
-            const nom=(s.nomforma||s.nom_session)+' ['+deb+'→'+fin+'] — '+s.nb_c+' stagiaire(s)';
+            const nom=(s.nomforma||s.nom_session)+' ['+deb+'→'+fin+'] - '+s.nb_c+' stagiaire(s)';
             $('<option>').val(s.id_session)
                 .text(nom)
                 .data('itf',s.idtypeformation||'')
@@ -920,7 +991,7 @@ function selAll(v){document.querySelectorAll('.cand-chk').forEach(c=>{c.checked=
 
 function updateNomAuto(nomF){
     const modOpt=$('#selMod').find(':selected');
-    const modTxt=modOpt.length&&modOpt.val()?modOpt.text().split('—')[0].trim():'';
+    const modTxt=modOpt.length&&modOpt.val()?modOpt.text().split('-')[0].trim():'';
     const debVal=document.getElementById('inpDeb').value;
     let datePart='';
     if(debVal){
@@ -930,7 +1001,7 @@ function updateNomAuto(nomF){
         const mois=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
         const now=new Date(); datePart=mois[now.getMonth()]+'.'+now.getFullYear();
     }
-    const nom=['FORM',modTxt,nomF?nomF.substring(0,30):'',datePart].filter(Boolean).join(' — ');
+    const nom=['FORM',modTxt,nomF?nomF.substring(0,30):'',datePart].filter(Boolean).join(' - ');
     document.getElementById('inpNom').value=nom;
 }
 $('#selMod').on('change',function(){
@@ -952,10 +1023,10 @@ function loadMods(itf){
          {num:4,nom:"Contrôle d'accès",id:''},{num:6,nom:"Fouille des bagages",id:''},
          {num:8,nom:"Inspection filtrage",id:''},{num:9,nom:"Gestion des incidents",id:''},
          {num:11,nom:"Facteurs humains et comportementaux",id:''}].forEach(m=>{
-            sel.innerHTML+=`<option value="${m.id}">Module ${m.num} — ${m.nom}</option>`;
+            sel.innerHTML+=`<option value="${m.id}">Module ${m.num} - ${m.nom}</option>`;
         });
     } else {
-        mods.forEach(m=>sel.innerHTML+=`<option value="${m.id}">Module ${m.num} — ${m.nom}</option>`);
+        mods.forEach(m=>sel.innerHTML+=`<option value="${m.id}">Module ${m.num} - ${m.nom}</option>`);
     }
     $('#selMod').trigger('change');
 }
@@ -994,7 +1065,7 @@ function saveModule(){
     $.post('sessions.php',{action:'add_module_ajax',idtypeformation:itf,numero_module:num,nom_module_fr:nomf,nom_module_en:nome},function(d){
         Swal.close();
         if(d.status==='success'){
-            $('#selMod').append(`<option value="${d.idmodule}" selected>Module ${d.numero_module} — ${d.nom_module_fr}</option>`).trigger('change');
+            $('#selMod').append(`<option value="${d.idmodule}" selected>Module ${d.numero_module} - ${d.nom_module_fr}</option>`).trigger('change');
             if(!modsData[itf]) modsData[itf]=[];
             modsData[itf].push({id:d.idmodule,num:d.numero_module,nom:d.nom_module_fr});
             closeModModal();
@@ -1028,14 +1099,85 @@ function initAccordion() {
 }
 
 function toggleModules(containerId, btn) {
-    const icon = btn.querySelector('i');
+    const icon    = btn.querySelector('i');
     const modules = document.querySelectorAll(`.module-row[data-container="${containerId}"]`);
-    const isHidden = modules.length > 0 && modules[0].style.display === 'none';
-    
+
+    /* ── Cas 0 module : guider l'utilisateur ── */
+    if (modules.length === 0) {
+        /* Récupérer les infos de la session depuis la ligne conteneur */
+        const contRow  = document.getElementById(containerId);
+        const nomSess  = contRow ? contRow.querySelector('strong')?.textContent || '' : '';
+
+        Swal.fire({
+            icon            : 'info',
+            title           : 'Aucun module évalué',
+            html            :
+                '<div style="text-align:center;font-family:Candara,sans-serif;padding:6px 0;">' +
+
+                /* Icône illustrée */
+                '<div style="font-size:3rem;margin-bottom:10px;">📋</div>' +
+
+                /* Explication */
+                '<p style="font-size:.93rem;color:#374151;margin-bottom:14px;">' +
+                  'Cette session de formation n\'a encore <strong>aucun module d\'évaluation</strong> associé.' +
+                '</p>' +
+
+                /* Encadré bleu instruction */
+                '<div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:10px;' +
+                    'padding:12px 16px;text-align:left;margin-bottom:14px;">' +
+                  '<p style="font-weight:700;color:#1e40af;margin-bottom:8px;">' +
+                    '<i class="fas fa-lightbulb" style="color:#f59e0b;margin-right:6px;"></i>' +
+                    'Comment créer une évaluation de module ?</p>' +
+                  '<ol style="margin:0;padding-left:20px;color:#374151;font-size:.85rem;line-height:1.8;">' +
+                    '<li>Faites défiler la page vers le <strong>haut</strong></li>' +
+                    '<li>Cliquez sur l\'onglet <strong style="color:#9d174d;">📋 Évaluation FORM</strong></li>' +
+                    '<li>Dans <em>« Session de formation planifiée »</em>, sélectionnez votre formation</li>' +
+                    '<li>Choisissez le <strong>module</strong> à évaluer (ex : Module 3, 4, 6…)</li>' +
+                    '<li>Sélectionnez les <strong>candidats</strong> à évaluer</li>' +
+                    '<li>Cliquez sur <strong>« Créer l\'évaluation »</strong></li>' +
+                  '</ol>' +
+                '</div>' +
+
+                /* Note seuil */
+                '<div style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;' +
+                    'padding:8px 12px;font-size:.78rem;color:#92400e;">' +
+                  '<i class="fas fa-info-circle" style="margin-right:5px;"></i>' +
+                  'Seuil de réussite FORM : <strong>≥ 70 %</strong> par module.' +
+                '</div>' +
+
+                '</div>',
+            showCancelButton    : true,
+            confirmButtonColor  : '#03224c',
+            cancelButtonColor   : '#6b7280',
+            confirmButtonText   : '<i class="fas fa-arrow-up me-1"></i> Aller créer un module',
+            cancelButtonText    : 'Fermer',
+            allowOutsideClick   : true,
+            customClass         : { popup: 'swal-form-guide' }
+        }).then(r => {
+            if (r.isConfirmed) {
+                /* Scroll vers le formulaire de création FORM et ouvrir l'onglet */
+                const tabForm = document.querySelector('[data-tab="form"]') ||
+                                document.querySelector('.tab-form') ||
+                                document.querySelector('[onclick*="form"]');
+                if (tabForm) {
+                    tabForm.click();
+                    tabForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else {
+                    /* Fallback : scroll vers le haut */
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            }
+        });
+        return; /* Ne rien déplier */
+    }
+
+    /* ── Cas normal : dérouler / replier les modules ── */
+    const isHidden = modules[0].style.display === 'none';
+
     modules.forEach(mod => {
         mod.style.display = isHidden ? '' : 'none';
     });
-    
+
     if (icon) {
         if (isHidden) {
             icon.classList.remove('fa-plus-circle');

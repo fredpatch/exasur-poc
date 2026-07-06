@@ -1,6 +1,6 @@
 <?php
 /**
- * dashboard.php — Tableau de bord EXASUR ANAC GABON
+ * dashboard.php -Tableau de bord EXASUR ANAC GABON
  * Filtres dynamiques (date exacte session), KPIs AJAX, rapports Select2
  * SEUIL UNIQUE : 70% pour TOUS les examens
  */
@@ -153,7 +153,7 @@ $active_page='dashboard';
 <html lang="fr">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Tableau de bord — EXASUR ANAC</title>
+<title>Tableau de bord -EXASUR ANAC</title>
 <link rel="icon" href="../assets/images/faviconLOGOANAC.ico">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -253,8 +253,8 @@ $active_page='dashboard';
 <div class="banner">
     <img src="../assets/images/Logo-ANAC-CERTIFICATION.png" alt="ANAC" onerror="this.style.display='none'">
     <div>
-        <h1>EXASUR — Administration ANAC GABON</h1>
-        <p>Plateforme de gestion des examens de certification AVSEC-FAL — Aviation Civile du Gabon</p>
+        <h1>EXASUR -Administration ANAC GABON</h1>
+        <p>Plateforme de gestion des examens de certification AVSEC-FAL -Aviation Civile du Gabon</p>
     </div>
     <div class="ms-auto text-center">
         <div class="banner-taux" id="banTaux"><?= $taux_global ?>%</div>
@@ -295,7 +295,7 @@ $active_page='dashboard';
         <select id="fType" onchange="scheduleRefresh()">
             <option value="">Tous types</option>
             <?php $types_list->data_seek(0);while($t=$types_list->fetch_assoc()): ?>
-            <option value="<?= $t['idtype_examen'] ?>"><?= $t['code'] ?> — <?= htmlspecialchars($t['nom_fr']) ?></option>
+            <option value="<?= $t['idtype_examen'] ?>"><?= $t['code'] ?> -<?= htmlspecialchars($t['nom_fr']) ?></option>
             <?php endwhile; ?>
         </select>
     </div>
@@ -413,7 +413,7 @@ $active_page='dashboard';
             <select id="rpt_session" class="form-select-admin s2rpt" style="margin-bottom:12px;width:100%;">
                 <option value="">-- Rechercher une session --</option>
                 <?php $sessions_list->data_seek(0);while($s=$sessions_list->fetch_assoc()):?>
-                <option value="<?= $s['id_session'] ?>"><?= htmlspecialchars($s['nom_session'].' ['.date('d/m/Y',strtotime($s['date_debut'])).']') ?></option>
+                <option value="<?= $s['id_session'] ?>"><?= htmlspecialchars($s['nom_session'].' ['.date('d/m/Y',strtotime($s['date_fin'])).']') ?></option>
                 <?php endwhile;?>
             </select>
             <button class="btn-anac w-100" onclick="printRpt('session')"><i class="fas fa-chart-bar me-2"></i>Classement par mérite</button>
@@ -429,7 +429,7 @@ $active_page='dashboard';
             <select id="rpt_orga" class="form-select-admin s2rpt" style="margin-bottom:12px;width:100%;">
                 <option value="">-- Rechercher un organisme --</option>
                 <?php $organismes_list->data_seek(0);while($o=$organismes_list->fetch_assoc()):?>
-                <option value="<?= $o['idorga'] ?>" data-nb="<?= $o['nb_candidats'] ?>"><?= htmlspecialchars(($o['trigrorganisme']?'['.$o['trigrorganisme'].'] ':'').$o['nomorga'].($o['ville_org']?' — '.$o['ville_org']:'')).' ('.$o['nb_candidats'].' cand.)' ?></option>
+                <option value="<?= $o['idorga'] ?>" data-nb="<?= $o['nb_candidats'] ?>"><?= htmlspecialchars(($o['trigrorganisme']?'['.$o['trigrorganisme'].'] ':'').$o['nomorga'].($o['ville_org']?' -'.$o['ville_org']:'')).' ('.$o['nb_candidats'].' cand.)' ?></option>
                 <?php endwhile;?>
             </select>
             <div id="orgaInfo" style="display:none;background:#eff6ff;padding:8px 12px;border-radius:8px;font-size:.82rem;color:#1e40af;margin-bottom:10px;">
@@ -448,7 +448,7 @@ $active_page='dashboard';
             <select id="rpt_type" class="form-select-admin s2rpt" style="margin-bottom:12px;width:100%;">
                 <option value="">Toutes les questions</option>
                 <?php $types_list->data_seek(0);while($t=$types_list->fetch_assoc()):?>
-                <option value="<?= $t['idtype_examen'] ?>"><?= $t['code'] ?> — <?= htmlspecialchars($t['nom_fr']) ?></option>
+                <option value="<?= $t['idtype_examen'] ?>"><?= $t['code'] ?> -<?= htmlspecialchars($t['nom_fr']) ?></option>
                 <?php endwhile;?>
             </select>
             <button class="btn-anac w-100" style="background:linear-gradient(135deg,#16a34a,#15803d)" onclick="printRpt('questions')"><i class="fas fa-list me-2"></i>Exporter les questions</button>

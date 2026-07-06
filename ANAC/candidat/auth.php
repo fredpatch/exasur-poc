@@ -1,10 +1,14 @@
 <?php
 /**
- * auth.php — Page d'authentification candidat
- * CORRECTIONS :
- *  1. Spinner infini : IS_IF=false → onCodeChange() ne lance aucun fetch
- *  2. Select session pratique IF stable : populateSessions() préserve la valeur sélectionnée
- *  3. setEtape() ne se re-déclenche pas si l'étape est déjà active (guard clause)
+ * auth.php - Page d'authentification candidat
+ * ANAC GABON - EXASUR
+ *
+ * CORRECTIONS DG :
+ *  1. Durées corrigées partout : AS/INST=2h, IF théorie=2h, IF pratique=1h30
+ *  2. Liste sessions : affiche date_fin (et non date_debut deux fois)
+ *  3. Nom session nettoyé : suppression des espaces/tirets superflus
+ *  4. Modal règlement : durées et seuil corrects par type
+ *  5. Seuil affiché : 70% pour AS/IF/INST/SENS (non la valeur brute BDD)
  */
 session_start();
 include '../php/db_connection.php';
@@ -13,7 +17,7 @@ include '../lang/lang_loader.php';
 $type_personnel = isset($_GET['type']) ? intval($_GET['type']) : 1;
 $etape          = isset($_GET['etape']) ? trim($_GET['etape']) : 'theorie';
 
-// ── Récupérer les infos du type d'examen ────────────────────────────────────
+// ── Type d'examen ────────────────────────────────────────────────────────────
 $stmt_type = $conn->prepare("SELECT * FROM type_examen WHERE idtype_examen = ? AND actif = 1");
 $stmt_type->bind_param("i", $type_personnel);
 $stmt_type->execute();
@@ -29,18 +33,26 @@ $code_type      = $type_info['code'];
 $nom_type       = $type_info['nom_fr'];
 $a_deux_parties = intval($type_info['a_deux_parties']);
 
-// ── Récupérer les sessions ───────────────────────────────────────────────────
+// Seuil affiché : toujours 70 % pour AS/IF/INST/SENS
+$seuil_affiche = in_array($type_personnel, [1,2,3,4]) ? 70 : floatval($type_info['seuil_reussite']);
+
+// ── Nettoyage du nom de session ──────────────────────────────────────────────
+// Supprime les espaces/tirets multiples et les espacements irréguliers
+// Exemple : "IF -    Certification AVSEC" → "IF - Certification AVSEC"
+function cleanNomSession(string $nom): string {
+    // Remplacer plusieurs espaces consécutifs par un seul
+    $nom = preg_replace('/\s{2,}/', ' ', $nom);
+    // Normaliser les tirets : espace-tiret(s)-espace → " - "
+    $nom = preg_replace('/\s*-+\s*/', ' - ', $nom);
+    $nom = preg_replace('/\s*-{2,}\s*/', ' - ', $nom);
+    return trim($nom);
+}
+
+// ── Récupérer les sessions (avec date_fin) ───────────────────────────────────
 function getSessions(mysqli $db, int $idtype, string $type_session): array {
-    /*
-     * FORM (idtype=5) : afficher UNIQUEMENT les sessions d'évaluation par module
-     * (créées dans sessions.php admin, avec idmodule IS NOT NULL)
-     * Les sessions-conteneurs créées par l'import AGFAC-DU (idmodule IS NULL) sont EXCLUES.
-     *
-     * Autres types : filtre normal par type_session.
-     */
     if ($idtype === 5) {
         $st = $db->prepare(
-            "SELECT id_session, nom_session, date_debut
+            "SELECT id_session, nom_session, date_debut, date_fin
              FROM session_examen
              WHERE idtype_examen = 5
                AND idmodule IS NOT NULL
@@ -50,7 +62,7 @@ function getSessions(mysqli $db, int $idtype, string $type_session): array {
         $st->execute();
     } else {
         $st = $db->prepare(
-            "SELECT id_session, nom_session, date_debut
+            "SELECT id_session, nom_session, date_debut, date_fin
              FROM session_examen
              WHERE idtype_examen = ? AND type_session = ? AND statut IN ('planifiee','en_cours')
              ORDER BY date_debut ASC"
@@ -80,8 +92,48 @@ if ($a_deux_parties && $type_personnel == 2) {
     $sessions_list = getSessions($conn, $type_personnel, 'normal');
 }
 
-$duree_label = ($type_personnel == 2 && $etape === 'pratique') ? '1h Pratique'
-             : ($type_personnel == 2 ? '1h Théorie' : '1h30');
+// ── Libellé durée corrigé (Directive DG) ────────────────────────────────────
+// AS=2h, INST=2h, IF théorie=2h, IF pratique=1h30, SENS=1h
+if ($type_personnel == 2) {
+    $duree_label = ($etape === 'pratique') ? '1h30 Pratique' : '2h Théorie';
+} elseif (in_array($type_personnel, [1, 3])) {
+    $duree_label = '2h'; // AS, INST
+} elseif ($type_personnel == 4) {
+    $duree_label = '1h'; // SENS
+} else {
+    $duree_label = formatDureeAuth(intval($type_info['duree_minutes'] ?? 90));
+}
+
+function formatDureeAuth($min) {
+    if ($min >= 60) {
+        $h = floor($min/60); $m = $min%60;
+        return $h.'h'.($m>0 ? str_pad($m,2,'0',STR_PAD_LEFT) : '');
+    }
+    return $min.'min';
+}
+
+// ── Texte durée pour le modal règlement ─────────────────────────────────────
+if ($type_personnel == 2) {
+    $duree_modal = '2h Théorie + 1h30 Pratique (total 3h30)';
+} elseif (in_array($type_personnel, [1, 3])) {
+    $duree_modal = '2h (120 minutes)';
+} elseif ($type_personnel == 4) {
+    $duree_modal = '1h (60 minutes)';
+} else {
+    $duree_modal = formatDureeAuth(intval($type_info['duree_minutes'] ?? 90));
+}
+
+// ── Description de l'examen pour le modal ───────────────────────────────────
+$desc_modal = '';
+if ($type_personnel == 1) {
+    $desc_modal = 'Théorie : 100 questions QCM - 2h - Seuil ≥ 70 %';
+} elseif ($type_personnel == 2) {
+    $desc_modal = 'Théorie : 100 questions QCM - 2h - Seuil ≥ 70 %<br>Pratique : questions images radiologiques - 1h30 - Seuil cumulé ≥ 70 %';
+} elseif ($type_personnel == 3) {
+    $desc_modal = 'Théorie : 100 questions QCM - 2h - Seuil ≥ 70 %';
+} elseif ($type_personnel == 4) {
+    $desc_modal = 'Sensibilisation : 20 questions QCM - 1h - Seuil ≥ 70 %';
+}
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo $_SESSION['lang'] ?? 'fr'; ?>">
@@ -157,7 +209,6 @@ $duree_label = ($type_personnel == 2 && $etape === 'pratique') ? '1h Pratique'
         .breadcrumb { background:transparent; padding:8px 0; }
         .breadcrumb a { color:var(--anac-blue); text-decoration:none; }
         .breadcrumb a:hover { color:var(--anac-gold); }
-        /* Spinner — déclaré mais affiché SEULEMENT via JS pour les examens IF */
         .spinner-inline {
             display:none; width:18px; height:18px;
             border:3px solid rgba(3,34,76,.2); border-top-color:var(--anac-blue);
@@ -197,19 +248,26 @@ $duree_label = ($type_personnel == 2 && $etape === 'pratique') ? '1h Pratique'
 
         <div class="card-body">
             <div class="text-center mb-4">
-                <span class="info-badge"><i class="fas fa-clock me-1"></i> <span id="dureeLbl"><?php echo $duree_label; ?></span></span>
-                <span class="info-badge ms-2"><i class="fas fa-check-circle me-1"></i>Seuil : <?php echo $type_info['seuil_reussite']; ?>%</span>
+                <!-- Durée et seuil corrigés -->
+                <span class="info-badge">
+                    <i class="fas fa-clock me-1"></i>
+                    <span id="dureeLbl"><?php echo htmlspecialchars($duree_label); ?></span>
+                </span>
+                <span class="info-badge ms-2">
+                    <i class="fas fa-check-circle me-1"></i>Seuil : <strong><?php echo $seuil_affiche; ?>%</strong>
+                </span>
             </div>
 
             <?php if ($a_deux_parties && $type_personnel == 2): ?>
+            <!-- Sélecteur Théorie / Pratique IF - durées corrigées -->
             <div class="etape-selector" id="etapeSelector">
                 <button type="button" class="etape-btn <?php echo $etape !== 'pratique' ? 'active' : ''; ?>"
                         id="btnTheorie" onclick="setEtape('theorie')">
-                    <i class="fas fa-book me-2"></i>Théorie (1h)
+                    <i class="fas fa-book me-2"></i>Théorie (2h)
                 </button>
                 <button type="button" class="etape-btn <?php echo $etape === 'pratique' ? 'active' : ''; ?>"
                         id="btnPratique" onclick="setEtape('pratique')">
-                    <i class="fas fa-images me-2"></i>Pratique (1h)
+                    <i class="fas fa-images me-2"></i>Pratique (1h30)
                 </button>
             </div>
             <div id="autoDetectBadge">
@@ -239,7 +297,7 @@ $duree_label = ($type_personnel == 2 && $etape === 'pratique') ? '1h Pratique'
 
                 <div class="mb-3">
                     <label for="code_acces" class="form-label">
-                        <i class="fas fa-id-card me-2"></i><?php echo __('code_acces'); ?> 
+                        <i class="fas fa-id-card me-2"></i><?php echo __('code_acces'); ?>
                         <?php if ($a_deux_parties && $type_personnel == 2): ?>
                         <span class="spinner-inline" id="codeSpinner"></span>
                         <?php endif; ?>
@@ -267,9 +325,13 @@ $duree_label = ($type_personnel == 2 && $etape === 'pratique') ? '1h Pratique'
                     </label>
                     <select class="form-select" id="id_session" name="id_session" required>
                         <option value=""><?php echo __('selectionnez_session'); ?></option>
-                        <?php foreach ($sessions_list as $s): ?>
+                        <?php foreach ($sessions_list as $s):
+                            // Nettoyer le nom + afficher date_fin (et non date_debut deux fois)
+                            $nomClean  = cleanNomSession($s['nom_session']);
+                            $dateFin   = date('d/m/Y', strtotime($s['date_fin']));
+                        ?>
                             <option value="<?php echo $s['id_session']; ?>">
-                                <?php echo htmlspecialchars($s['nom_session'] . ' (' . date('d/m/Y', strtotime($s['date_debut'])) . ')'); ?>
+                                <?php echo htmlspecialchars($nomClean . ' (' . $dateFin . ')'); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -283,7 +345,7 @@ $duree_label = ($type_personnel == 2 && $etape === 'pratique') ? '1h Pratique'
                     <input class="form-check-input" type="checkbox" id="acceptTerms" required>
                     <label class="form-check-label" for="acceptTerms">
                         <?php echo __('accepte_conditions'); ?>
-                        <a href="#" onclick="showTerms(); return false;">(voir)</a>
+                        <a href="#" onclick="showTerms(); return false;">(voir le règlement)</a>
                     </label>
                 </div>
 
@@ -306,22 +368,39 @@ $duree_label = ($type_personnel == 2 && $etape === 'pratique') ? '1h Pratique'
 
 <script>
 // ══════════════════════════════════════════════════════════════════════════════
-// Variables globales
+// Variables PHP → JS
 // ══════════════════════════════════════════════════════════════════════════════
-const IS_IF            = <?php echo ($a_deux_parties && $type_personnel == 2) ? 'true' : 'false'; ?>;
-const sessionsTheorie  = <?php echo json_encode($sessions_theorie,  JSON_UNESCAPED_UNICODE); ?>;
-const sessionsPratique = <?php echo json_encode($sessions_pratique, JSON_UNESCAPED_UNICODE); ?>;
-let   currentEtape     = '<?php echo htmlspecialchars($etape); ?>';
-let   detectTimer      = null;
+const IS_IF = <?php echo ($a_deux_parties && $type_personnel == 2) ? 'true' : 'false'; ?>;
+
+// Sessions avec date_fin pour le rendu JS (IF théorie/pratique dynamique)
+const sessionsTheorie  = <?php echo json_encode(array_map(function($s){
+    return [
+        'id_session'  => $s['id_session'],
+        'nom_session' => cleanNomSession($s['nom_session']),
+        'date_debut'  => $s['date_debut'],
+        'date_fin'    => $s['date_fin'],
+    ];
+}, $sessions_theorie), JSON_UNESCAPED_UNICODE); ?>;
+
+const sessionsPratique = <?php echo json_encode(array_map(function($s){
+    return [
+        'id_session'  => $s['id_session'],
+        'nom_session' => cleanNomSession($s['nom_session']),
+        'date_debut'  => $s['date_debut'],
+        'date_fin'    => $s['date_fin'],
+    ];
+}, $sessions_pratique), JSON_UNESCAPED_UNICODE); ?>;
+
+let currentEtape = '<?php echo htmlspecialchars($etape); ?>';
+let detectTimer  = null;
 
 // ── Bouton soumettre ──────────────────────────────────────────────────────────
 document.getElementById('acceptTerms').addEventListener('change', function () {
     document.getElementById('submitBtn').disabled = !this.checked;
 });
 
-// ── Sélecteur Théorie / Pratique ──────────────────────────────────────────────
+// ── Sélecteur Théorie / Pratique (IF) ────────────────────────────────────────
 function setEtape(etape) {
-    // CORRECTION : guard clause — évite un re-déclenchement inutile et un reset du select
     if (currentEtape === etape) return;
     currentEtape = etape;
 
@@ -334,36 +413,38 @@ function setEtape(etape) {
     const lbl = document.getElementById('etapeHeaderLabel');
     if (lbl) lbl.textContent = etape === 'pratique' ? 'Pratique' : 'Théorie';
 
-    document.getElementById('dureeLbl').textContent = etape === 'pratique' ? '1h Pratique' : '1h Théorie';
+    // Durées corrigées DG
+    document.getElementById('dureeLbl').textContent = etape === 'pratique' ? '1h30 Pratique' : '2h Théorie';
 
     populateSessions(etape);
 }
 
 /**
- * populateSessions — remplit le <select> sessions
- * CORRECTION : conserve la valeur sélectionnée si elle existe dans la nouvelle liste
+ * populateSessions - remplit le <select> sessions
+ * CORRECTION : affiche date_fin (pas date_debut en double) + nom nettoyé
  */
 function populateSessions(etape) {
     const sel     = document.getElementById('id_session');
     const list    = etape === 'pratique' ? sessionsPratique : sessionsTheorie;
     const msg     = document.getElementById('noSessionMsg');
-    const prevVal = sel.value; // sauvegarder avant de vider
+    const prevVal = sel.value;
 
     sel.innerHTML = '<option value="">Sélectionnez une session...</option>';
 
     if (list.length === 0) {
-        msg.style.display = 'block';
+        if (msg) msg.style.display = 'block';
         return;
     }
-    msg.style.display = 'none';
+    if (msg) msg.style.display = 'none';
 
     list.forEach(s => {
-        const d   = new Date(s.date_debut);
-        const fmt = d.toLocaleDateString('fr-FR');
+        // Formater date_fin en dd/mm/yyyy
+        const dateFin = new Date(s.date_fin);
+        const fmt = dateFin.toLocaleDateString('fr-FR');
+
         const opt = document.createElement('option');
         opt.value       = s.id_session;
         opt.textContent = s.nom_session + ' (' + fmt + ')';
-        // Restaurer la sélection précédente si elle correspond à cette liste
         if (String(s.id_session) === String(prevVal)) opt.selected = true;
         sel.appendChild(opt);
     });
@@ -371,12 +452,9 @@ function populateSessions(etape) {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Détection automatique de l'étape candidat IF
-// CORRECTION PRINCIPALE : si IS_IF === false, onCodeChange() ne fait RIEN.
-// C'est ce qui causait la "roue infinie" sur les examens non-IF.
 // ══════════════════════════════════════════════════════════════════════════════
 function onCodeChange(val) {
-    if (!IS_IF) return; // ← CORRECTION : stop total pour les examens non-IF
-
+    if (!IS_IF) return;
     clearTimeout(detectTimer);
     hideAutoDetect();
     if (val.length < 5) return;
@@ -385,15 +463,11 @@ function onCodeChange(val) {
 
 function detectEtapeCandidat(code) {
     if (!IS_IF) return;
-
     const spinner = document.getElementById('codeSpinner');
     if (spinner) spinner.style.display = 'inline-block';
 
     fetch('check_if_status.php?code=' + encodeURIComponent(code))
-        .then(r => {
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            return r.json();
-        })
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(data => {
             if (spinner) spinner.style.display = 'none';
             if (!data.found) { hideAutoDetect(); return; }
@@ -405,13 +479,11 @@ function detectEtapeCandidat(code) {
                 badge.className = 'warning';
                 msgEl.textContent = '⚠️ ' + data.nom + ', vous avez déjà passé les deux épreuves IF.';
                 badge.style.display = 'block';
-
             } else if (data.theorie_faite && !data.pratique_faite) {
                 badge.className = '';
                 msgEl.textContent = '✅ Bonjour ' + data.nom + ' ! Théorie validée (' + data.note_theorie + '%). Veuillez passer la PRATIQUE.';
                 badge.style.display = 'block';
                 if (currentEtape !== 'pratique') setEtape('pratique');
-
             } else {
                 if (currentEtape !== 'theorie') {
                     badge.className = '';
@@ -434,23 +506,73 @@ function hideAutoDetect() {
     if (b) b.style.display = 'none';
 }
 
-// ── Modal règlement ───────────────────────────────────────────────────────────
+// ── Modal règlement - durées et seuil corrects ────────────────────────────────
 function showTerms() {
+    const typeCode  = '<?php echo $code_type; ?>';
+    const duree     = '<?php echo addslashes($duree_modal); ?>';
+    const seuil     = '<?php echo $seuil_affiche; ?>';
+    const descExtra = '<?php echo addslashes($desc_modal); ?>';
+
     Swal.fire({
-        title: '📋 Règlement de l\'examen',
-        html: `<div style="text-align:left;max-height:360px;overflow-y:auto;">
-            <ul style="padding-left:20px;">
-                <li>Durée : <strong><?php echo ($type_personnel==2) ? '1h Théorie + 1h Pratique' : '1h30'; ?></strong></li>
-                <li>Toute fraude entraîne l'annulation de l'examen</li>
-                <li>5 infractions = verrouillage automatique</li>
-                <li>Seuil de réussite : <strong><?php echo $type_info['seuil_reussite']; ?>%</strong></li>
-                <li>Navigation libre entre les questions</li>
-            </ul>
-            <p class="mt-3"><strong>PNSAC – Programme National de Sûreté de l'Aviation Civile</strong></p>
+        title: '📋 Règlement de l\'examen ' + typeCode,
+        html: `<div style="text-align:left;max-height:380px;overflow-y:auto;font-family:Candara,sans-serif;">
+            <table style="width:100%;border-collapse:collapse;font-size:.9rem;">
+                <tr style="background:#f0f4ff;">
+                    <td style="padding:9px 12px;font-weight:700;color:#03224c;width:40%;">
+                        <i class="fas fa-clock" style="color:#D4AF37;margin-right:6px;"></i>Durée
+                    </td>
+                    <td style="padding:9px 12px;font-weight:600;">${duree}</td>
+                </tr>
+                <tr>
+                    <td style="padding:9px 12px;font-weight:700;color:#03224c;">
+                        <i class="fas fa-trophy" style="color:#D4AF37;margin-right:6px;"></i>Seuil de réussite
+                    </td>
+                    <td style="padding:9px 12px;font-weight:700;color:#16a34a;font-size:1.1rem;">≥ ${seuil}%</td>
+                </tr>
+                ${descExtra ? `<tr style="background:#f0f4ff;">
+                    <td style="padding:9px 12px;font-weight:700;color:#03224c;">
+                        <i class="fas fa-list-check" style="color:#D4AF37;margin-right:6px;"></i>Épreuves
+                    </td>
+                    <td style="padding:9px 12px;font-size:.85rem;">${descExtra}</td>
+                </tr>` : ''}
+                <tr>
+                    <td style="padding:9px 12px;font-weight:700;color:#03224c;">
+                        <i class="fas fa-ban" style="color:#dc2626;margin-right:6px;"></i>Fraude
+                    </td>
+                    <td style="padding:9px 12px;color:#dc2626;font-weight:600;">Annulation immédiate de l'examen</td>
+                </tr>
+                <tr style="background:#f0f4ff;">
+                    <td style="padding:9px 12px;font-weight:700;color:#03224c;">
+                        <i class="fas fa-lock" style="color:#D4AF37;margin-right:6px;"></i>Infractions
+                    </td>
+                    <td style="padding:9px 12px;">5 infractions = <strong>verrouillage automatique</strong></td>
+                </tr>
+                <tr>
+                    <td style="padding:9px 12px;font-weight:700;color:#03224c;">
+                        <i class="fas fa-arrows-alt-h" style="color:#D4AF37;margin-right:6px;"></i>Navigation
+                    </td>
+                    <td style="padding:9px 12px;">Libre entre les questions</td>
+                </tr>
+                <tr style="background:#f0f4ff;">
+                    <td style="padding:9px 12px;font-weight:700;color:#03224c;">
+                        <i class="fas fa-eye-slash" style="color:#D4AF37;margin-right:6px;"></i>Résultat
+                    </td>
+                    <td style="padding:9px 12px;font-size:.85rem;">
+                        ${typeCode === 'SENS' || typeCode === 'FORM'
+                            ? 'Affiché à la fin de l\'examen'
+                            : '<strong>Confidentiel</strong> - transmis à l\'administration ANAC uniquement'}
+                    </td>
+                </tr>
+            </table>
+            <div style="margin-top:12px;padding:10px 14px;background:#fff8e1;border-left:4px solid #D4AF37;border-radius:6px;font-size:.8rem;color:#78350f;">
+                <i class="fas fa-info-circle me-1"></i>
+                ANAC GABON - Programme National de Sûreté de l'Aviation Civile (PNSAC)
+            </div>
         </div>`,
         icon: 'info',
         confirmButtonColor: '#03224c',
-        confirmButtonText: 'OK, j\'ai compris'
+        confirmButtonText: '<i class="fas fa-check me-1"></i>OK, j\'ai compris',
+        width: 520
     });
 }
 </script>

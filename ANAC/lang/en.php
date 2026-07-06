@@ -14,28 +14,28 @@ $lang = [
     'anglais'                       => 'English',
 
     // Home page
-    'titre_accueil'                 => 'AIR SECURE - Online AVSEC Exam Platform',
+    'titre_accueil'                 => 'EXASUR - Online AVSEC Exam Platform',
     'sous_titre_accueil'            => 'Aviation Security & Facilitation',
     'description_accueil'          => 'National Civil Aviation Security Programme (PNSAC) - Directorate of Security and Facilitation. Online assessment of AVSEC personnel.',
     'consulter_note'                => 'Check my score',
     'categories_personnel'          => 'Personnel Categories',
     'type_examen'                   => 'Exam type',
-    'presentation_projet'           => 'AIR SECURE – Aviation Security Assessment Platform',
+    'presentation_projet'           => 'EXASUR – Aviation Security Assessment Platform',
 
     // Categories
     'agent_surete'                  => 'Security Agent',
-    'agent_surete_desc'             => 'Security agent certification (50 MCQ, 70% pass mark)',
+    'agent_surete_desc'             => 'Security agent certification (100 MCQ, 2h, pass mark ≥ 70%)- Confidential result',
     'agent_if'                      => 'Screening Agent',
-    'agent_if_desc'                 => 'Theoretical (50 MCQ) + practical (50 3D images), average ≥ 70%',
+    'agent_if_desc'                 => 'Theory: 100 MCQ (2h, pass mark ≥ 70%) + Practical: X-ray images (1h30, cumulative pass mark ≥ 70%)- Confidential result',
     'instructeur'                   => 'Instructor',
-    'instructeur_desc'              => 'Security instructor certification (50 random MCQ, 70% pass mark)',
+    'instructeur_desc'              => 'Security instructor certification (100 MCQ, 2h, pass mark ≥ 70%)- Confidential result',
     'sensibilisation'               => 'Security Awareness',
-    'sensibilisation_desc'          => 'Aviation security awareness (20 MCQ, 70% pass mark)',
+    'sensibilisation_desc'          => 'Aviation security awareness (20 MCQ, 1h, pass mark ≥ 70%)',
     'formation'                     => 'Training Evaluation',
     'formation_desc'                => 'Module-based evaluation (modules 2,3,4,6,8,9,11), weighted, 70% pass mark',
 
     // Features
-    'duree'                         => '1h30',
+    'duree'                         => '2h',
     'questions'                     => 'questions',
     'seuil'                         => 'threshold',
     'voir_instructions'             => 'View instructions',
@@ -140,7 +140,7 @@ $lang = [
     'minutes_restantes_5'           => '5 MINUTES REMAINING',
     'finalisez_reponses'            => 'Finalize your answers quickly!',
 
-    // Results — ALL KEYS
+    // Results- ALL KEYS
     'resultat_officiel'             => 'OFFICIAL RESULT',
     'bonnes_reponses'               => 'Correct answers',
     'mauvaises_reponses'            => 'Wrong answers',

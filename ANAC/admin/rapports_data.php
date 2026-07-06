@@ -1,59 +1,77 @@
 <?php
 /**
- * rapports_data.php — Endpoint AJAX pour rapports.php (Centre d'impression croisé)
- * ANAC GABON — AIR SECURE
+ * rapports_data.php- Endpoint AJAX pour rapports.php
+ * ANAC GABON- EXASUR
  *
- * POST params:
- *   date_debut  string  (obligatoire)  ex: 2026-04-20
- *   date_fin    string  (obligatoire)  ex: 2026-05-24
- *   type_id     int     (optionnel)    filtrer par type examen
- *   cand_id     int     (optionnel)    filtrer par candidat
- *   session_nom string  (optionnel)    filtrer par nom session (LIKE)
- *
- * Logique de filtrage : EXACT sur date_debut = ? AND date_fin = ?
- * (jamais d'intervalles — une session xx/yy est différente de xx/zz)
+ * Retourne TOUJOURS du JSON valide.
+ * Le try/catch global empêche tout HTTP 500.
  */
 
+/* ── Bloquer tout affichage PHP avant le JSON ── */
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
+ob_start();                    // capture toute sortie parasite (warnings, BOM, etc.)
+
 session_start();
-if (!isset($_SESSION['admin_id'])) {
-    http_response_code(403);
-    echo json_encode(['status'=>'error','message'=>'Non autorisé']);
+
+header('Content-Type: application/json; charset=utf-8');
+
+/* ── Fonction helper : sortie JSON et exit ── */
+function jout($data) {
+    ob_end_clean();            // vider les sorties parasites
+    echo json_encode($data, JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-header('Content-Type: application/json; charset=utf-8');
-include '../php/db_connection.php';
+/* ── Auth ── */
+if (!isset($_SESSION['admin_id'])) {
+    jout(['status'=>'error','message'=>'Non autorisé (session expirée).']);
+}
 
-/* ── Paramètres ──────────────────────────────────────────────────── */
+/* ── DB ── */
+try {
+    include '../php/db_connection.php';
+} catch (Throwable $e) {
+    jout(['status'=>'error','message'=>'Connexion BDD impossible : '.$e->getMessage()]);
+}
+
+/* ── Paramètres POST ── */
 $date_debut  = trim($_POST['date_debut']  ?? '');
 $date_fin    = trim($_POST['date_fin']    ?? '');
 $type_id     = intval($_POST['type_id']   ?? 0);
 $cand_id     = intval($_POST['cand_id']   ?? 0);
-$session_nom = trim($_POST['session_nom'] ?? '');
 
-if (!$date_debut || !$date_fin) {
-    echo json_encode(['status'=>'error','message'=>'Veuillez renseigner la date de début et de fin de session.']);
-    exit;
+/* ── Validation dates ── */
+if (($date_debut && !$date_fin) || (!$date_debut && $date_fin)) {
+    jout(['status'=>'error','message'=>'Renseignez la date de début ET la date de fin ensemble.']);
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   ÉTAPE 1 — Trouver les sessions concernées (filtre EXACT)
-   ══════════════════════════════════════════════════════════════════ */
-$where_sess  = "se.date_debut = ? AND se.date_fin = ?";
-$params      = [$date_debut, $date_fin];
-$types_bind  = "ss";
+   TOUT LE RESTE dans un try/catch → plus jamais de HTTP 500
+══════════════════════════════════════════════════════════════════ */
+try {
 
+/* ── Construction du WHERE sessions ── */
+$where_parts = [];
+$params      = [];
+$types_bind  = '';
+
+if ($date_debut && $date_fin) {
+    $where_parts[] = "se.date_debut >= ?";
+    $where_parts[] = "se.date_fin   <= ?";
+    $params[]      = $date_debut;
+    $params[]      = $date_fin;
+    $types_bind   .= 'ss';
+}
 if ($type_id > 0) {
-    $where_sess .= " AND se.idtype_examen = ?";
-    $params[]    = $type_id;
-    $types_bind .= "i";
-}
-if ($session_nom !== '') {
-    $where_sess .= " AND se.nom_session LIKE ?";
-    $params[]    = '%' . $session_nom . '%';
-    $types_bind .= "s";
+    $where_parts[] = "se.idtype_examen = ?";
+    $params[]      = $type_id;
+    $types_bind   .= 'i';
 }
 
+$where_sql = $where_parts ? implode(' AND ', $where_parts) : '1=1';
+
+/* ── Requête sessions ── */
 $sql_sess = "
     SELECT se.id_session, se.nom_session, se.type_session,
            se.idtype_examen, se.idtypeformation,
@@ -63,29 +81,40 @@ $sql_sess = "
     FROM session_examen se
     JOIN type_examen te ON te.idtype_examen = se.idtype_examen
     LEFT JOIN candidat_session cs ON cs.id_session = se.id_session AND cs.habilite = 1
-    WHERE $where_sess
+    WHERE $where_sql
     GROUP BY se.id_session
     ORDER BY te.idtype_examen, se.type_session
 ";
 
-$stmt = $conn->prepare($sql_sess);
-$stmt->bind_param($types_bind, ...$params);
-$stmt->execute();
-$sessions_raw = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
-
-if (empty($sessions_raw)) {
-    echo json_encode([
-        'status'           => 'empty',
-        'message'          => "Aucune session trouvée pour la période du $date_debut au $date_fin.",
-        'total_candidats'  => 0,
-        'groupes'          => []
-    ]);
-    exit;
+if (empty($params)) {
+    /* Pas de paramètres → query directe */
+    $r = $conn->query($sql_sess);
+    if ($r === false) {
+        jout(['status'=>'error','message'=>'Erreur SQL sessions : '.$conn->error]);
+    }
+    $sessions_raw = $r->fetch_all(MYSQLI_ASSOC);
+} else {
+    $stmt = $conn->prepare($sql_sess);
+    if ($stmt === false) {
+        jout(['status'=>'error','message'=>'Prepare sessions échoué : '.$conn->error]);
+    }
+    $stmt->bind_param($types_bind, ...$params);
+    $stmt->execute();
+    $sessions_raw = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
 }
 
-/* ── Regrouper les sessions par type d'examen ────────────────────── */
-$groupes_sessions = [];  // type_code => [sessions]
+/* ── Aucune session ── */
+if (empty($sessions_raw)) {
+    $msg = $date_debut
+        ? "Aucune session du $date_debut au $date_fin"
+        : "Aucune session trouvée.";
+    if ($type_id > 0) $msg .= " pour ce type d'examen";
+    jout(['status'=>'empty','message'=>$msg,'total_candidats'=>0,'groupes'=>[]]);
+}
+
+/* ── Regrouper par type ── */
+$groupes_sessions = [];
 foreach ($sessions_raw as $s) {
     $code = $s['type_code'];
     if (!isset($groupes_sessions[$code])) {
@@ -95,75 +124,67 @@ foreach ($sessions_raw as $s) {
             'a_deux_parties' => (bool)$s['a_deux_parties'],
             'idtype_examen'  => $s['idtype_examen'],
             'idtypeformation'=> $s['idtypeformation'],
-            'sessions'       => []
+            'sessions'       => [],
         ];
     }
     $groupes_sessions[$code]['sessions'][] = $s;
 }
 
-/* ══════════════════════════════════════════════════════════════════
-   ÉTAPE 2 — Pour chaque groupe, charger les résultats des candidats
-   ══════════════════════════════════════════════════════════════════ */
+/* ── Filtre candidat ── */
+$cand_filter       = '';
+$cand_filter_types = '';
+$cand_filter_vals  = [];
+if ($cand_id > 0) {
+    $cand_filter        = " AND cs.idcandidat = ?";
+    $cand_filter_types  = 'i';
+    $cand_filter_vals[] = $cand_id;
+}
+
+/* ══════════════════════════════════════════════════════
+   TRAITEMENT PAR TYPE
+══════════════════════════════════════════════════════ */
 $groupes_result  = [];
 $total_candidats = 0;
 
 foreach ($groupes_sessions as $code => $grp) {
 
-    $session_ids = array_column($grp['sessions'], 'id_session');
-    $placeholders = implode(',', array_fill(0, count($session_ids), '?'));
+    $session_ids  = array_column($grp['sessions'], 'id_session');
+    $ph           = implode(',', array_fill(0, count($session_ids), '?'));
+    $ids_types    = str_repeat('i', count($session_ids));
 
-    /* ── Filtre optionnel candidat ── */
-    $cand_filter       = '';
-    $cand_filter_types = '';
-    $cand_filter_val   = [];
-    if ($cand_id > 0) {
-        $cand_filter        = " AND cs.idcandidat = ?";
-        $cand_filter_types  = "i";
-        $cand_filter_val[]  = $cand_id;
-    }
-
-    /* ─────────────────────────────────────────────────────────────
-       CAS IF — deux parties théorie + pratique
-       ───────────────────────────────────────────────────────────── */
+    /* ─── CAS IF ─── */
     if ($code === 'IF' && $grp['a_deux_parties']) {
 
-        /* IDs sessions théorie et pratique */
-        $id_theo = null; $id_prat = null;
+        $id_theo = null;
+        $id_prat = null;
         foreach ($grp['sessions'] as $s) {
-            if ($s['type_session'] === 'theorique') $id_theo = $s['id_session'];
-            if ($s['type_session'] === 'pratique')  $id_prat = $s['id_session'];
+            if ($s['type_session'] === 'theorie')  $id_theo = $s['id_session'];
+            if ($s['type_session'] === 'pratique') $id_prat = $s['id_session'];
         }
 
-        /* Liste des candidats habilités (union des deux sessions) */
-        $sql_cands = "
-            SELECT DISTINCT cs.idcandidat,
-                   st.nomstagiaire, st.prenomstagiaire,
-                   ca.code_acces,
-                   o.trigrorganisme AS orga, st.fonction AS poste
-            FROM candidat_session cs
-            JOIN candidat ca ON ca.idcandidat = cs.idcandidat
-            JOIN si_anac.stagiaire st ON st.idstagiaire = ca.idstagiaire
-            LEFT JOIN si_anac.organisme o ON o.idorga = st.idorga
-            WHERE cs.id_session IN ($placeholders) AND cs.habilite = 1
-            $cand_filter
-            ORDER BY st.nomstagiaire, st.prenomstagiaire
-        ";
-        $bind_types = str_repeat('i', count($session_ids)) . $cand_filter_types;
-        $bind_vals  = array_merge($session_ids, $cand_filter_val);
-
-        $stmt = $conn->prepare($sql_cands);
-        $stmt->bind_param($bind_types, ...$bind_vals);
-        $stmt->execute();
-        $cands_if = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
+        /* Candidats */
+        $sql_c = "SELECT DISTINCT cs.idcandidat,
+                         st.nomstagiaire, st.prenomstagiaire,
+                         ca.code_acces,
+                         o.nomorga AS orga, st.postestagiaire AS poste
+                  FROM candidat_session cs
+                  JOIN candidat ca ON ca.idcandidat = cs.idcandidat
+                  JOIN si_anac.stagiaire st ON st.idstagiaire = ca.idstagiaire
+                  LEFT JOIN si_anac.organisme o ON o.idorga = st.idorga
+                  WHERE cs.id_session IN ($ph) AND cs.habilite = 1 $cand_filter
+                  ORDER BY st.nomstagiaire, st.prenomstagiaire";
+        $bt = $ids_types.$cand_filter_types;
+        $bv = array_merge($session_ids, $cand_filter_vals);
+        $st = $conn->prepare($sql_c);
+        $st->bind_param($bt, ...$bv);
+        $st->execute();
+        $cands_if = $st->get_result()->fetch_all(MYSQLI_ASSOC);
+        $st->close();
 
         /* Résultats théorie */
         $res_theo = [];
         if ($id_theo) {
-            $st = $conn->prepare("
-                SELECT r.idcandidat, r.note_finale, r.note_sur, r.pourcentage, r.reussite_theo, r.reussite
-                FROM resultats r WHERE r.id_session = ?
-            ");
+            $st = $conn->prepare("SELECT idcandidat,note_finale,note_sur,pourcentage,reussite_theo,reussite FROM resultats WHERE id_session=?");
             $st->bind_param('i', $id_theo);
             $st->execute();
             foreach ($st->get_result()->fetch_all(MYSQLI_ASSOC) as $row)
@@ -174,10 +195,7 @@ foreach ($groupes_sessions as $code => $grp) {
         /* Résultats pratique */
         $res_prat = [];
         if ($id_prat) {
-            $st = $conn->prepare("
-                SELECT r.idcandidat, r.note_finale, r.note_sur, r.pourcentage, r.reussite_prat, r.reussite, r.moyenne_if
-                FROM resultats r WHERE r.id_session = ?
-            ");
+            $st = $conn->prepare("SELECT idcandidat,note_finale,note_sur,pourcentage,reussite_prat,reussite,moyenne_if FROM resultats WHERE id_session=?");
             $st->bind_param('i', $id_prat);
             $st->execute();
             foreach ($st->get_result()->fetch_all(MYSQLI_ASSOC) as $row)
@@ -185,25 +203,20 @@ foreach ($groupes_sessions as $code => $grp) {
             $st->close();
         }
 
-        /* Construire liste candidats IF avec données fusionnées */
+        /* Fusion */
         $candidats_if = [];
         foreach ($cands_if as $c) {
-            $cid  = $c['idcandidat'];
-            $th   = $res_theo[$cid] ?? null;
-            $pr   = $res_prat[$cid] ?? null;
+            $cid = $c['idcandidat'];
+            $th  = $res_theo[$cid] ?? null;
+            $pr  = $res_prat[$cid] ?? null;
 
-            // Seuil IF = 80%
-            $pct_theo = $th ? round($th['pourcentage'], 1) : null;
-            $pct_prat = $pr ? round($pr['pourcentage'], 1) : null;
-            $moy_if   = ($pct_theo !== null && $pct_prat !== null)
-                        ? round(($pct_theo + $pct_prat) / 2, 1) : null;
-
+            $pct_theo      = $th ? round((float)$th['pourcentage'], 1) : null;
+            $pct_prat      = $pr ? round((float)$pr['pourcentage'], 1) : null;
+            $moy_if        = ($pct_theo !== null && $pct_prat !== null)
+                             ? round(($pct_theo + $pct_prat) / 2, 1) : null;
             $reussite_theo = $th ? (bool)$th['reussite_theo'] : null;
             $reussite_prat = $pr ? (bool)$pr['reussite_prat'] : null;
-            $reussite_if   = ($reussite_theo && $reussite_prat);
-
-            $note_theo = $th ? round($th['note_finale'],1).'/'.round($th['note_sur'],1).' pts' : null;
-            $note_prat = $pr ? round($pr['note_finale'],1).'/'.round($pr['note_sur'],1).' pts' : null;
+            $reussite_if   = ($reussite_theo && $reussite_prat) ? true : false;
 
             $candidats_if[] = [
                 'idcandidat'    => $cid,
@@ -211,13 +224,13 @@ foreach ($groupes_sessions as $code => $grp) {
                 'code'          => $c['code_acces'],
                 'orga'          => $c['orga'] ?? '',
                 'poste'         => $c['poste'] ?? '',
-                'a_passe'       => ($th || $pr),
+                'a_passe'       => (bool)($th || $pr),
                 'reussite'      => $reussite_if,
                 'pct_theo'      => $pct_theo,
-                'note_theo'     => $note_theo,
+                'note_theo'     => $th ? round((float)$th['note_finale'],1).'/'.round((float)$th['note_sur'],1).' pts' : null,
                 'reussite_theo' => $reussite_theo,
                 'pct_prat'      => $pct_prat,
-                'note_prat'     => $note_prat,
+                'note_prat'     => $pr ? round((float)$pr['note_finale'],1).'/'.round((float)$pr['note_sur'],1).' pts' : null,
                 'reussite_prat' => $reussite_prat,
                 'moy_if'        => $moy_if,
                 'pct'           => $moy_if,
@@ -228,260 +241,222 @@ foreach ($groupes_sessions as $code => $grp) {
             ];
         }
 
-        // Tri par moy_if DESC
         usort($candidats_if, fn($a,$b) => ($b['moy_if']??-1) <=> ($a['moy_if']??-1));
-
-        $seuil = 80;
+        $seuil = 70;
         $nb_ok = count(array_filter($candidats_if, fn($x) => $x['reussite']));
 
         $groupes_result[] = [
-            'code'       => $code,
-            'nom'        => $grp['nom'],
-            'seuil'      => $seuil,
-            'sessions'   => array_map(fn($s) => ['id'=>$s['id_session'],'nom'=>$s['nom_session'],'type'=>$s['type_session']], $grp['sessions']),
-            'modules'    => [],
-            'candidats'  => $candidats_if,
-            'nb_ok'      => $nb_ok,
-            'nb_ko'      => count($candidats_if) - $nb_ok,
-            'nb_total'   => count($candidats_if),
-            'taux'       => count($candidats_if) > 0 ? round($nb_ok/count($candidats_if)*100,1) : 0,
+            'code'      => $code,
+            'nom'       => $grp['nom'],
+            'seuil'     => $seuil,
+            'sessions'  => array_map(fn($s) => ['id'=>$s['id_session'],'nom'=>$s['nom_session'],'type'=>$s['type_session']], $grp['sessions']),
+            'modules'   => [],
+            'candidats' => $candidats_if,
+            'nb_ok'     => $nb_ok,
+            'nb_ko'     => count($candidats_if) - $nb_ok,
+            'nb_total'  => count($candidats_if),
+            'taux'      => count($candidats_if) > 0 ? round($nb_ok/count($candidats_if)*100,1) : 0,
         ];
         $total_candidats += count($candidats_if);
 
-    /* ─────────────────────────────────────────────────────────────
-       CAS FORM — formation par modules
-       ───────────────────────────────────────────────────────────── */
+    /* ─── CAS FORM ─── */
     } elseif ($code === 'FORM') {
 
-        $idtype_form = $grp['idtypeformation'];
+        $idtype_form = intval($grp['idtypeformation'] ?? 0);
+        $modules_list = [];
 
-        /* Liste des modules pour cette formation */
-        $sql_mod = "
-            SELECT mf.idmodule, mf.numero_module, mf.nom_module_fr AS nom
-            FROM module_formation mf
-            WHERE mf.idtypeformation = ?
-            ORDER BY mf.numero_module
-        ";
-        $st = $conn->prepare($sql_mod);
-        $st->bind_param('i', $idtype_form);
-        $st->execute();
-        $modules_list = $st->get_result()->fetch_all(MYSQLI_ASSOC);
-        $st->close();
+        if ($idtype_form > 0) {
+            $st = $conn->prepare("SELECT idmodule,numero_module,nom_module_fr AS nom FROM module_formation WHERE idtypeformation=? ORDER BY numero_module");
+            $st->bind_param('i', $idtype_form);
+            $st->execute();
+            $modules_list = $st->get_result()->fetch_all(MYSQLI_ASSOC);
+            $st->close();
+        }
+
         $module_ids = array_column($modules_list, 'idmodule');
 
-        /* Candidats habilités */
-        $sql_cands = "
-            SELECT DISTINCT cs.idcandidat,
-                   st.nomstagiaire, st.prenomstagiaire, ca.code_acces,
-                   o.trigrorganisme AS orga, st.fonction AS poste
-            FROM candidat_session cs
-            JOIN candidat ca ON ca.idcandidat = cs.idcandidat
-            JOIN si_anac.stagiaire st ON st.idstagiaire = ca.idstagiaire
-            LEFT JOIN si_anac.organisme o ON o.idorga = st.idorga
-            WHERE cs.id_session IN ($placeholders) AND cs.habilite = 1
-            $cand_filter
-            ORDER BY st.nomstagiaire, st.prenomstagiaire
-        ";
-        $bind_types = str_repeat('i', count($session_ids)) . $cand_filter_types;
-        $bind_vals  = array_merge($session_ids, $cand_filter_val);
-        $stmt = $conn->prepare($sql_cands);
-        $stmt->bind_param($bind_types, ...$bind_vals);
-        $stmt->execute();
-        $cands_form = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
+        /* Candidats */
+        $sql_c = "SELECT DISTINCT cs.idcandidat,
+                         st.nomstagiaire, st.prenomstagiaire, ca.code_acces,
+                         o.nomorga AS orga, st.postestagiaire AS poste
+                  FROM candidat_session cs
+                  JOIN candidat ca ON ca.idcandidat = cs.idcandidat
+                  JOIN si_anac.stagiaire st ON st.idstagiaire = ca.idstagiaire
+                  LEFT JOIN si_anac.organisme o ON o.idorga = st.idorga
+                  WHERE cs.id_session IN ($ph) AND cs.habilite = 1 $cand_filter
+                  ORDER BY st.nomstagiaire, st.prenomstagiaire";
+        $bt = $ids_types.$cand_filter_types;
+        $bv = array_merge($session_ids, $cand_filter_vals);
+        $st = $conn->prepare($sql_c);
+        $st->bind_param($bt, ...$bv);
+        $st->execute();
+        $cands_form = $st->get_result()->fetch_all(MYSQLI_ASSOC);
+        $st->close();
 
-        /* Notes par module pour chaque candidat */
-        $notes_module = [];  // [idcandidat][idmodule] = {note, pct, reussite}
+        /* Notes par module */
+        $notes_module = [];
         if (!empty($module_ids)) {
             $ph_mod = implode(',', array_fill(0, count($module_ids), '?'));
-            $ph_ses = $placeholders;
-            $sql_eval = "
-                SELECT em.idcandidat, em.idmodule,
-                       em.note_obtenue, em.note_sur, em.pourcentage, em.reussite
-                FROM evaluation_module em
-                WHERE em.id_session IN ($ph_ses)
-                  AND em.idmodule IN ($ph_mod)
-            ";
-            $bt = str_repeat('i', count($session_ids)) . str_repeat('i', count($module_ids));
-            $bv = array_merge($session_ids, $module_ids);
-            $st = $conn->prepare($sql_eval);
-            $st->bind_param($bt, ...$bv);
-            $st->execute();
-            foreach ($st->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
-                $notes_module[$row['idcandidat']][$row['idmodule']] = [
-                    'note'     => round($row['note_obtenue'],1).'/'.round($row['note_sur'],1),
-                    'pct'      => round($row['pourcentage'],1),
-                    'reussite' => (bool)$row['reussite'],
-                ];
+            $sql_ev = "SELECT em.idcandidat, em.idmodule,
+                              em.note_obtenue, em.note_sur, em.pourcentage, em.reussite
+                       FROM evaluation_module em
+                       WHERE em.id_session IN ($ph) AND em.idmodule IN ($ph_mod)";
+            $bt2 = $ids_types.str_repeat('i', count($module_ids));
+            $bv2 = array_merge($session_ids, $module_ids);
+            $st  = $conn->prepare($sql_ev);
+            if ($st) {
+                $st->bind_param($bt2, ...$bv2);
+                $st->execute();
+                foreach ($st->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+                    $notes_module[$row['idcandidat']][$row['idmodule']] = [
+                        'note'    => round((float)$row['note_obtenue'],1).'/'.round((float)$row['note_sur'],1).' pts',
+                        'pct'     => round((float)$row['pourcentage'],1),
+                        'reussite'=> (bool)$row['reussite'],
+                    ];
+                }
+                $st->close();
             }
         }
 
-        /* Résultat global (resultats table) */
-        $res_glob = [];
-        $st = $conn->prepare("
-            SELECT r.idcandidat, r.note_finale, r.note_sur, r.pourcentage,
-                   r.reussite, r.moyenne_if
-            FROM resultats r WHERE r.id_session IN ($placeholders)
-        ");
-        $st->bind_param(str_repeat('i',count($session_ids)), ...$session_ids);
-        $st->execute();
-        foreach ($st->get_result()->fetch_all(MYSQLI_ASSOC) as $row)
-            $res_glob[$row['idcandidat']] = $row;
-        $st->close();
-
+        /* Assembler */
         $candidats_form = [];
         foreach ($cands_form as $c) {
-            $cid     = $c['idcandidat'];
-            $glob    = $res_glob[$cid] ?? null;
-            $mods_c  = $notes_module[$cid] ?? [];
-
-            // Total points et % global
-            $tot_note = $glob ? round($glob['note_finale'],1).'/'.round($glob['note_sur'],1).' pts' : null;
-            $tot_pct  = $glob ? round($glob['pourcentage'],1) : null;
-            $reussite = $glob ? (bool)$glob['reussite'] : false;
-
+            $cid  = $c['idcandidat'];
+            $mods = $notes_module[$cid] ?? [];
+            $pcts = array_column($mods, 'pct');
+            $moy  = $pcts ? round(array_sum($pcts)/count($pcts), 1) : null;
+            $all_ok = $pcts && count($pcts) === count($module_ids)
+                      && count(array_filter($mods, fn($m) => $m['reussite'])) === count($module_ids);
             $candidats_form[] = [
                 'idcandidat' => $cid,
                 'nom'        => $c['nomstagiaire'].' '.$c['prenomstagiaire'],
                 'code'       => $c['code_acces'],
                 'orga'       => $c['orga'] ?? '',
                 'poste'      => $c['poste'] ?? '',
-                'a_passe'    => (bool)$glob,
-                'reussite'   => $reussite,
-                'pct'        => $tot_pct,
-                'note'       => $tot_note,
-                'pct_theo'   => null,
-                'note_theo'  => null,
-                'reussite_theo' => null,
-                'pct_prat'   => null,
-                'note_prat'  => null,
-                'reussite_prat' => null,
-                'moy_if'     => null,
-                'moy'        => $tot_pct,
-                'total_pts'  => $tot_note,
-                'modules'    => $mods_c,
+                'a_passe'    => !empty($mods),
+                'reussite'   => $all_ok,
+                'pct'        => $moy,
+                'moy'        => $moy,
+                'note'       => null,
+                'total_pts'  => null,
+                'modules'    => $mods,
+                'pct_theo'   => null,'note_theo'=>null,'reussite_theo'=>null,
+                'pct_prat'   => null,'note_prat'=>null,'reussite_prat'=>null,'moy_if'=>null,
             ];
         }
 
-        // Tri par % desc
-        usort($candidats_form, fn($a,$b) => ($b['pct']??-1) <=> ($a['pct']??-1));
-
+        usort($candidats_form, fn($a,$b) => ($b['moy']??-1) <=> ($a['moy']??-1));
         $seuil = 70;
         $nb_ok = count(array_filter($candidats_form, fn($x) => $x['reussite']));
 
         $groupes_result[] = [
-            'code'       => $code,
-            'nom'        => $grp['nom'],
-            'seuil'      => $seuil,
-            'sessions'   => array_map(fn($s) => ['id'=>$s['id_session'],'nom'=>$s['nom_session'],'type'=>$s['type_session']], $grp['sessions']),
-            'modules'    => $modules_list,
-            'candidats'  => $candidats_form,
-            'nb_ok'      => $nb_ok,
-            'nb_ko'      => count($candidats_form) - $nb_ok,
-            'nb_total'   => count($candidats_form),
-            'taux'       => count($candidats_form) > 0 ? round($nb_ok/count($candidats_form)*100,1) : 0,
+            'code'      => $code,
+            'nom'       => $grp['nom'],
+            'seuil'     => $seuil,
+            'sessions'  => array_map(fn($s)=>['id'=>$s['id_session'],'nom'=>$s['nom_session'],'type'=>$s['type_session']],$grp['sessions']),
+            'modules'   => array_map(fn($m)=>['idmodule'=>$m['idmodule'],'num'=>$m['numero_module'],'nom'=>$m['nom']],$modules_list),
+            'candidats' => $candidats_form,
+            'nb_ok'     => $nb_ok,
+            'nb_ko'     => count($candidats_form)-$nb_ok,
+            'nb_total'  => count($candidats_form),
+            'taux'      => count($candidats_form)>0?round($nb_ok/count($candidats_form)*100,1):0,
         ];
         $total_candidats += count($candidats_form);
 
-    /* ─────────────────────────────────────────────────────────────
-       CAS STANDARD — AS / INST / SENS (théorique uniquement)
-       ───────────────────────────────────────────────────────────── */
+    /* ─── CAS STANDARD : AS / INST / SENS ─── */
     } else {
 
-        /* Candidats + résultats en une seule requête */
         $sql_std = "
             SELECT cs.idcandidat,
                    st.nomstagiaire, st.prenomstagiaire, ca.code_acces,
-                   o.trigrorganisme AS orga, st.fonction AS poste,
-                   r.id AS rid, r.note_finale, r.note_sur, r.pourcentage, r.reussite,
-                   se.id_session, se.nom_session
+                   o.nomorga AS orga, st.postestagiaire AS poste,
+                   r.id AS rid, r.note_finale, r.note_sur, r.pourcentage, r.reussite
             FROM candidat_session cs
             JOIN candidat ca ON ca.idcandidat = cs.idcandidat
             JOIN si_anac.stagiaire st ON st.idstagiaire = ca.idstagiaire
             LEFT JOIN si_anac.organisme o ON o.idorga = st.idorga
             LEFT JOIN resultats r ON r.idcandidat = cs.idcandidat
-                AND r.id_session IN ($placeholders)
-            JOIN session_examen se ON cs.id_session = se.id_session
-            WHERE cs.id_session IN ($placeholders) AND cs.habilite = 1
-            $cand_filter
+                AND r.id_session = cs.id_session
+            WHERE cs.id_session IN ($ph) AND cs.habilite = 1 $cand_filter
             ORDER BY st.nomstagiaire, st.prenomstagiaire
         ";
-        $bind_types = str_repeat('i', count($session_ids)*2) . $cand_filter_types;
-        $bind_vals  = array_merge($session_ids, $session_ids, $cand_filter_val);
-        $stmt = $conn->prepare($sql_std);
-        $stmt->bind_param($bind_types, ...$bind_vals);
-        $stmt->execute();
-        $rows_std = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
+        $bt = $ids_types.$cand_filter_types;
+        $bv = array_merge($session_ids, $cand_filter_vals);
+        $st = $conn->prepare($sql_std);
+        if ($st === false) {
+            /* SQL échoué → passer ce groupe */
+            continue;
+        }
+        $st->bind_param($bt, ...$bv);
+        $st->execute();
+        $rows_std = $st->get_result()->fetch_all(MYSQLI_ASSOC);
+        $st->close();
 
-        // Dédoublonner par candidat (prendre le meilleur résultat si doublon)
-        $map_cand = [];
+        /* Dédoublonner par candidat */
+        $map = [];
         foreach ($rows_std as $row) {
             $cid = $row['idcandidat'];
-            if (!isset($map_cand[$cid]) ||
-                ($row['pourcentage'] > ($map_cand[$cid]['pct'] ?? -1))) {
-                $map_cand[$cid] = $row;
+            if (!isset($map[$cid]) ||
+                ((float)$row['pourcentage'] > (float)($map[$cid]['pourcentage']??-1))) {
+                $map[$cid] = $row;
             }
         }
 
         $candidats_std = [];
-        foreach ($map_cand as $cid => $row) {
-            $pct = $row['rid'] ? round($row['pourcentage'],1) : null;
+        foreach ($map as $cid => $row) {
+            $pct = $row['rid'] ? round((float)$row['pourcentage'],1) : null;
             $candidats_std[] = [
-                'idcandidat'   => $cid,
-                'nom'          => $row['nomstagiaire'].' '.$row['prenomstagiaire'],
-                'code'         => $row['code_acces'],
-                'orga'         => $row['orga'] ?? '',
-                'poste'        => $row['poste'] ?? '',
-                'a_passe'      => (bool)$row['rid'],
-                'reussite'     => $row['rid'] ? (bool)$row['reussite'] : false,
-                'pct'          => $pct,
-                'note'         => $row['rid']
-                                  ? round($row['note_finale'],1).'/'.round($row['note_sur'],1).' pts'
-                                  : null,
-                'pct_theo'     => null,
-                'note_theo'    => null,
-                'reussite_theo'=> null,
-                'pct_prat'     => null,
-                'note_prat'    => null,
-                'reussite_prat'=> null,
-                'moy_if'       => null,
-                'moy'          => $pct,
-                'total_pts'    => null,
-                'modules'      => [],
+                'idcandidat'    => $cid,
+                'nom'           => $row['nomstagiaire'].' '.$row['prenomstagiaire'],
+                'code'          => $row['code_acces'],
+                'orga'          => $row['orga'] ?? '',
+                'poste'         => $row['poste'] ?? '',
+                'a_passe'       => (bool)$row['rid'],
+                'reussite'      => $row['rid'] ? (bool)$row['reussite'] : false,
+                'pct'           => $pct,
+                'note'          => $row['rid'] ? round((float)$row['note_finale'],1).'/'.round((float)$row['note_sur'],1).' pts' : null,
+                'moy'           => $pct,
+                'total_pts'     => null,
+                'modules'       => [],
+                'pct_theo'      => null,'note_theo'=>null,'reussite_theo'=>null,
+                'pct_prat'      => null,'note_prat'=>null,'reussite_prat'=>null,'moy_if'=>null,
             ];
         }
 
-        // Tri par % desc
         usort($candidats_std, fn($a,$b) => ($b['pct']??-1) <=> ($a['pct']??-1));
-
-        $seuil = 80; // seuil défaut pour AS/INST/SENS
+        $seuil = 70;
         $nb_ok = count(array_filter($candidats_std, fn($x) => $x['reussite']));
 
         $groupes_result[] = [
-            'code'       => $code,
-            'nom'        => $grp['nom'],
-            'seuil'      => $seuil,
-            'sessions'   => array_map(fn($s) => ['id'=>$s['id_session'],'nom'=>$s['nom_session'],'type'=>$s['type_session']], $grp['sessions']),
-            'modules'    => [],
-            'candidats'  => $candidats_std,
-            'nb_ok'      => $nb_ok,
-            'nb_ko'      => count($candidats_std) - $nb_ok,
-            'nb_total'   => count($candidats_std),
-            'taux'       => count($candidats_std) > 0 ? round($nb_ok/count($candidats_std)*100,1) : 0,
+            'code'      => $code,
+            'nom'       => $grp['nom'],
+            'seuil'     => $seuil,
+            'sessions'  => array_map(fn($s)=>['id'=>$s['id_session'],'nom'=>$s['nom_session'],'type'=>$s['type_session']],$grp['sessions']),
+            'modules'   => [],
+            'candidats' => $candidats_std,
+            'nb_ok'     => $nb_ok,
+            'nb_ko'     => count($candidats_std)-$nb_ok,
+            'nb_total'  => count($candidats_std),
+            'taux'      => count($candidats_std)>0?round($nb_ok/count($candidats_std)*100,1):0,
         ];
         $total_candidats += count($candidats_std);
     }
 }
 
-/* ── Réponse finale ─────────────────────────────────────────────── */
-echo json_encode([
+/* ── Réponse finale ── */
+jout([
     'status'          => 'success',
     'date_debut'      => $date_debut,
     'date_fin'        => $date_fin,
     'total_candidats' => $total_candidats,
     'nb_groupes'      => count($groupes_result),
     'groupes'         => $groupes_result,
-], JSON_UNESCAPED_UNICODE);
+]);
 
-$conn->close();
+} catch (Throwable $e) {
+    /* Capture toute erreur fatale → JSON au lieu de HTTP 500 */
+    jout([
+        'status'  => 'error',
+        'message' => 'Erreur serveur : '.$e->getMessage().' (ligne '.$e->getLine().')',
+    ]);
+}

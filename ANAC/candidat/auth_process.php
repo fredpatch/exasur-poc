@@ -1,6 +1,6 @@
 <?php
 /**
- * auth_process.php — EXASUR ANAC GABON
+ * auth_process.php - EXASUR ANAC GABON
  * REMPLACE : EXASUR/ANAC/candidat/auth_process.php
  *
  * CORRECTION UNIQUE ET DÉFINITIVE DU BOUTON "OUI C'EST MOI" :
@@ -82,7 +82,7 @@ $sess_date_fin = $session_data['date_fin']      ?? date('Y-m-d');
 $sess_statut   = $session_data['statut']        ?? 'planifiee';
 $cs->close();
 
-/* Bloquer si annulée (mais pas terminée pour FORM — les modules peuvent encore être futurs) */
+/* Bloquer si annulée (mais pas terminée pour FORM - les modules peuvent encore être futurs) */
 if ($sess_statut === 'annulee') {
     popup("error","Session annulee","Cette session a ete annulee.","auth.php?type=$idtype_examen","#03224c");
     exit();
@@ -146,7 +146,7 @@ if ($candidat['is_logged_in'] == 1) {
 
    RÈGLE IF STRICTE : un candidat ayant déjà complété les 2 épreuves IF
    (théorie + pratique avec résultat) ne peut PAS repasser un nouvel IF
-   sur une session différente — il doit s'inscrire à une nouvelle session.
+   sur une session différente - il doit s'inscrire à une nouvelle session.
 ════════════════════════════════════════════════════════════ */
 $habilite = false;
 
@@ -157,7 +157,7 @@ $sh->execute();
 $habilite = ($sh->get_result()->num_rows > 0);
 $sh->close();
 
-/* ── Pour FORM : S1 est la SEULE stratégie — PAS de S2/S3 ── */
+/* ── Pour FORM : S1 est la SEULE stratégie - PAS de S2/S3 ── */
 if ($idtype_examen == 5 && !$habilite) {
     $conn->close();
     popupHtml(
@@ -266,23 +266,91 @@ $deja = $sdp->get_result()->fetch_assoc();
 $sdp->close();
 
 if ($deja && (floatval($deja['note_finale']) > 0 || intval($deja['locked']) === 1)) {
-    $pct   = round(floatval($deja['pourcentage']), 1);
     $reuss = intval($deja['reussite']);
-    $dated = date('d/m/Y H:i', strtotime($deja['date_fin']));
-    $c     = $reuss ? '#16a34a' : '#dc2626';
-    $men   = $reuss ? 'VALIDE'  : 'AJOURNE';
+    $dated = date('d/m/Y à H:i', strtotime($deja['date_fin']));
     $conn->close();
-    popupHtml(
-        "info","Examen deja passe",
-        "<p>Vous avez deja passe cet examen pour cette session.</p>
-         <div style='background:#f4f7fc;border-radius:12px;padding:14px;margin:10px 0;'>
-           <p>Score : <strong style='color:{$c};font-size:1.1rem;'>{$pct}%</strong></p>
-           <p>Mention : <strong style='color:{$c};'>{$men}</strong></p>
-           <p style='color:#9ca3af;font-size:.85rem;'>Le {$dated}</p>
-         </div>
-         <p style='color:#666;font-size:.9rem;'>Pour repasser, inscrivez-vous a une nouvelle session ANAC.</p>",
-        "auth.php?type=$idtype_examen", "#03224c"
-    );
+
+    /* ── Déterminer si le score est confidentiel (AS, IF, INST) ── */
+    $score_confidentiel = in_array($idtype_examen, [1, 2, 3]); // 1=AS 2=IF 3=INST
+
+    if ($score_confidentiel) {
+        /* ══ AS / IF / INST : SCORE MASQUÉ - directive DG ANAC ══ */
+        $icone   = $reuss ? '✅' : '🔒';
+        $mention = $reuss ? 'ADMIS(E)' : 'AJOURNÉ(E)';
+        $couleur = $reuss ? '#16a34a' : '#dc2626';
+        popupHtml(
+            "info","Examen déjà passé",
+            "<div style='text-align:center;font-family:Candara,sans-serif;'>
+
+             <div style='font-size:3rem;margin-bottom:8px;'>🔒</div>
+             <p style='font-size:.95rem;color:#374151;margin-bottom:16px;'>
+               Vous avez déjà passé cet examen pour cette session.
+             </p>
+
+             <div style='background:linear-gradient(135deg,#03224c,#0a3a6b);
+                         border-radius:12px;padding:16px;margin:12px 0;color:white;'>
+               <div style='font-size:1.4rem;font-weight:800;margin-bottom:4px;
+                           color:{$couleur};background:white;border-radius:8px;
+                           padding:8px 20px;display:inline-block;'>
+                 {$icone} {$mention}
+               </div>
+               <p style='color:rgba(255,255,255,.75);font-size:.8rem;margin-top:10px;margin-bottom:0;'>
+                 Passé le {$dated}
+               </p>
+             </div>
+
+             <div style='background:#fffbeb;border:1px solid #fde68a;border-radius:10px;
+                         padding:12px 14px;margin:12px 0;text-align:left;font-size:.83rem;color:#92400e;'>
+               <i class='fas fa-lock' style='margin-right:6px;'></i>
+               <strong>Score confidentiel - ANAC GABON</strong><br>
+               Conformément à la directive de l'OACI, votre note et votre
+               pourcentage ne sont pas communiqués directement.
+               Votre résultat complet est transmis à l'administration ANAC GABON.
+               Rapprochez-vous de votre hiérarchie.
+             </div>
+
+             <p style='color:#6b7280;font-size:.83rem;margin-top:12px;'>
+               Pour repasser, inscrivez-vous à une nouvelle session ANAC GABON.
+             </p>
+             </div>",
+            "auth.php?type=$idtype_examen", "#03224c"
+        );
+    } else {
+        /* ══ SENS / FORM : score VISIBLE ══ */
+        $pct   = round(floatval($deja['pourcentage']), 1);
+        $c     = $reuss ? '#16a34a' : '#dc2626';
+        $men   = $reuss ? '✅ VALIDÉ(E)' : '❌ AJOURNÉ(E)';
+        $icone = $reuss ? '🏆' : '📋';
+        popupHtml(
+            "info","Examen déjà passé",
+            "<div style='text-align:center;font-family:Candara,sans-serif;'>
+
+             <div style='font-size:2.5rem;margin-bottom:8px;'>{$icone}</div>
+             <p style='font-size:.93rem;color:#374151;margin-bottom:14px;'>
+               Vous avez déjà passé cet examen pour cette session.
+             </p>
+
+             <div style='background:#f8faff;border:2px solid #e5e7eb;
+                         border-radius:12px;padding:16px;margin:10px 0;'>
+               <div style='font-size:2.5rem;font-weight:800;color:{$c};'>{$pct}%</div>
+               <div style='font-size:.78rem;color:#9ca3af;margin-bottom:10px;'>Score obtenu</div>
+               <div style='font-size:1rem;font-weight:700;color:{$c};
+                           background:white;border:2px solid {$c};border-radius:8px;
+                           padding:6px 16px;display:inline-block;'>
+                 {$men}
+               </div>
+               <p style='color:#9ca3af;font-size:.78rem;margin-top:10px;margin-bottom:0;'>
+                 Passé le {$dated}
+               </p>
+             </div>
+
+             <p style='color:#6b7280;font-size:.83rem;margin-top:12px;'>
+               Pour repasser, inscrivez-vous à une nouvelle session ANAC GABON.
+             </p>
+             </div>",
+            "auth.php?type=$idtype_examen", "#03224c"
+        );
+    }
     exit();
 }
 
@@ -314,22 +382,44 @@ if ($a_deux_parties == 1 && $idtype_examen == 2) {
      * pouvait tenter de repasser la pratique même après avoir tout complété.
      */
     if ($has_theo && $has_prat) {
-        $moy = round(($pct_theo+$pct_prat)/2,1);
-        $cr  = $reuss_if ? '#16a34a' : '#dc2626';
-        $vd  = $reuss_if ? 'VALIDÉ'  : 'AJOURNÉ';
+        $reuss_final = $reuss_if ? 'ADMIS(E)' : 'AJOURNÉ(E)';
+        $icone_final = $reuss_if ? '✅' : '🔒';
+        $col_final   = $reuss_if ? '#16a34a' : '#dc2626';
         $conn->close();
         popupHtml(
             "info","Certification IF déjà complétée",
-            "<p><strong>Vous avez déjà effectué les deux épreuves de la certification IF.</strong></p>
-             <div style='background:#f4f7fc;border-radius:12px;padding:14px;margin:10px 0;'>
-               <p>Théorie : <strong>{$pct_theo}%</strong></p>
-               <p>Pratique : <strong>{$pct_prat}%</strong></p>
-               <p style='border-top:1px solid #ddd;padding-top:8px;'>
-                 Moyenne IF : <strong style='color:{$cr};font-size:1.1rem;'>{$moy}%</strong>
-                 &mdash; <strong style='color:{$cr};'>{$vd}</strong>
+            "<div style='text-align:center;font-family:Candara,sans-serif;'>
+
+             <div style='font-size:3rem;margin-bottom:8px;'>🔒</div>
+             <p style='font-size:.93rem;color:#374151;margin-bottom:14px;'>
+               <strong>Vous avez déjà effectué les deux épreuves de la certification IF</strong>
+               pour cette session.
+             </p>
+
+             <div style='background:linear-gradient(135deg,#03224c,#0a3a6b);
+                         border-radius:12px;padding:16px;margin:12px 0;color:white;'>
+               <div style='font-size:1.3rem;font-weight:800;
+                           color:{$col_final};background:white;border-radius:8px;
+                           padding:8px 20px;display:inline-block;'>
+                 {$icone_final} {$reuss_final}
+               </div>
+               <p style='color:rgba(255,255,255,.7);font-size:.78rem;margin-top:10px;margin-bottom:0;'>
+                 Certification IF - ANAC GABON
                </p>
              </div>
-             <p style='color:#666;font-size:.88rem;'>Votre certification est terminée. Pour repasser, contactez l'administration ANAC.</p>",
+
+             <div style='background:#fffbeb;border:1px solid #fde68a;border-radius:10px;
+                         padding:12px 14px;margin:12px 0;text-align:left;font-size:.83rem;color:#92400e;'>
+               <i class='fas fa-lock' style='margin-right:6px;'></i>
+               <strong>Résultat confidentiel - Directive DG ANAC GABON</strong><br>
+               Vos notes et moyennes théorie/pratique IF ne sont pas communiquées
+               directement. Rapprochez-vous de votre hiérarchie ou service RH.
+             </div>
+
+             <p style='color:#6b7280;font-size:.83rem;'>
+               Votre certification est terminée. Pour repasser, contactez l'administration ANAC.
+             </p>
+             </div>",
             "auth.php?type=2", "#03224c"
         );
         exit();
@@ -340,7 +430,7 @@ if ($a_deux_parties == 1 && $idtype_examen == 2) {
    RÈGLE : pour accéder à la pratique, le candidat DOIT avoir
    une théorie validée (≥70%) dans la MÊME session ou dans une
    session de même idtypeformation. Cela s'applique même si le
-   candidat a déjà fait un IF complet dans le passé — pour une
+   candidat a déjà fait un IF complet dans le passé - pour une
    nouvelle session, il repart de la théorie.
 ────────────────────────────────────────────────────────── */
 $pct_theorie_ok = null;
@@ -392,12 +482,38 @@ if ($a_deux_parties == 1 && $idtype_examen == 2 && $type_session === 'pratique')
     if ($pct_theorie_ok < 70) {
         $conn->close();
         popupHtml(
-            "error","Score théorique insuffisant",
-            "<div style='background:#fee2e2;border-radius:12px;padding:14px;margin-bottom:12px;border-left:4px solid #dc2626;'>
-               <p style='font-weight:700;color:#991b1b;'>Score théorie : <strong>{$pct_theorie_ok}%</strong></p>
-               <p style='color:#991b1b;font-size:.9rem;'>Seuil minimum requis : <strong>70%</strong></p>
+            "error","Accès à la pratique refusé",
+            "<div style='text-align:center;font-family:Candara,sans-serif;'>
+
+             <div style='font-size:3rem;margin-bottom:8px;'>🔒</div>
+             <p style='font-size:.93rem;color:#374151;margin-bottom:14px;'>
+               Votre score théorique est <strong>insuffisant</strong> pour
+               accéder à l'épreuve pratique IF.
+             </p>
+
+             <div style='background:#fee2e2;border:1.5px solid #fca5a5;border-radius:12px;
+                         padding:14px;margin:12px 0;'>
+               <p style='font-weight:800;color:#991b1b;font-size:1rem;margin-bottom:4px;'>
+                 ❌ Score insuffisant
+               </p>
+               <p style='color:#7f1d1d;font-size:.85rem;margin:0;'>
+                 Seuil minimum requis pour accéder à la pratique : <strong>70%</strong>
+               </p>
              </div>
-             <p style='color:#555;font-size:.9rem;'>Accès à la pratique refusé. Vous êtes ajourné(e).</p>",
+
+             <div style='background:#fffbeb;border:1px solid #fde68a;border-radius:10px;
+                         padding:12px 14px;margin:12px 0;text-align:left;font-size:.83rem;color:#92400e;'>
+               <i class='fas fa-lock' style='margin-right:6px;'></i>
+               <strong>Résultat confidentiel - Directive DG ANAC GABON</strong><br>
+               Votre note exacte ne vous est pas communiquée.
+               Rapprochez-vous de votre hiérarchie ou de votre service RH.
+             </div>
+
+             <p style='color:#6b7280;font-size:.83rem;'>
+               Vous êtes ajourné(e) à cette session. Pour vous réinscrire,
+               contactez l'administration ANAC GABON.
+             </p>
+             </div>",
             "../index.php", "#03224c"
         );
         exit();

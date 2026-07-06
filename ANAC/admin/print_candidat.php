@@ -1,6 +1,6 @@
 <?php
 /**
- * print_candidat.php — DOSSIER COMPLET DE RÉSULTATS — EXASUR ANAC GABON
+ * print_candidat.php -DOSSIER COMPLET DE RÉSULTATS -EXASUR ANAC GABON
  * ══════════════════════════════════════════════════════════════════════
  * SEUIL UNIQUE : Score ≥ 70% = RÉUSSI / VALIDÉ
  *                Score < 70% = ÉCHEC / AJOURNÉ
@@ -236,7 +236,7 @@ function typeStyle(string $code): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dossier Résultats — <?= htmlspecialchars($c['nomstagiaire'].' '.$c['prenomstagiaire']) ?></title>
+<title>Dossier Résultats -<?= htmlspecialchars($c['nomstagiaire'].' '.$c['prenomstagiaire']) ?></title>
 <link rel="icon" href="../assets/images/faviconLOGOANAC.ico">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
@@ -506,7 +506,7 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
                 Dossier Complet de Résultats
             </div>
             <div class="doc-subtitle">
-                Complete Results File — EXASUR / AVSEC-FAL · ANAC GABON
+                Complete Results File -EXASUR / AVSEC-FAL · ANAC GABON
             </div>
         </div>
     </div>
@@ -520,7 +520,7 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
         <p>Aucun examen enregistré pour ce candidat.</p>
         <p style="font-size:.8rem;margin-top:5px;">
             <strong><?= htmlspecialchars($c['nomstagiaire'].' '.$c['prenomstagiaire']) ?></strong>
-            — Code : <strong><?= htmlspecialchars($c['code_acces'] ?? '—') ?></strong>
+            -Code : <strong><?= htmlspecialchars($c['code_acces'] ?? '—') ?></strong>
         </p>
     </div>
     <?php else: ?>
@@ -590,7 +590,7 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
     <div class="sommaire">
         <div class="som-head">
             <i class="fas fa-list-ul"></i>
-            <h3>Sommaire — <?= count($examens) ?> examen(s)</h3>
+            <h3>Sommaire -<?= count($examens) ?> examen(s)</h3>
         </div>
         <div class="som-body">
             <table class="stom">
@@ -704,7 +704,7 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
                         &nbsp;·&nbsp;
                         <span style="color:#fca5a5;font-weight:700;">
                             <i class="fas fa-lock"></i>
-                            Verrouillé — <?= htmlspecialchars($ex['reason'] ?? '') ?>
+                            Verrouillé -<?= htmlspecialchars($ex['reason'] ?? '') ?>
                         </span>
                         <?php endif; ?>
                     </p>
@@ -788,7 +788,7 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
                 <div class="prog-lbl">
                     <span>0%</span>
                     <span style="color:<?= $col ?>;font-weight:700;">
-                        <?= $pv ?>% — Seuil : 70%
+                        <?= $pv ?>% -Seuil : 70%
                     </span>
                     <span>100%</span>
                 </div>
@@ -933,7 +933,7 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
             <div class="synth-block">
                 <div class="synth-head">
                     <i class="fas fa-graduation-cap"></i>
-                    <h4>Synthèse FORM — <?= $sf2['nb'] ?> module(s)</h4>
+                    <h4>Synthèse FORM -<?= $sf2['nb'] ?> module(s)</h4>
                     <div class="savg"><?= $sf2['moy'] ?>% de moyenne</div>
                 </div>
                 <table class="stbl">
@@ -980,15 +980,15 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
                 <div class="<?= $sf2['reussite']?'sfoot-ok':'sfoot-ko' ?>">
                     <i class="fas fa-<?= $sf2['reussite']?'check-circle':'times-circle' ?>"></i>
                     <?= $sf2['reussite']
-                        ?'Formation VALIDÉE — Moyenne '.$sf2['moy'].'% ≥ 70% sur '.$sf2['nb'].' module(s).'
-                        :'Formation NON VALIDÉE — Moyenne '.$sf2['moy'].'% inférieure au seuil de 70% requis.' ?>
+                        ?'Formation VALIDÉE -Moyenne '.$sf2['moy'].'% ≥ 70% sur '.$sf2['nb'].' module(s).'
+                        :'Formation NON VALIDÉE -Moyenne '.$sf2['moy'].'% inférieure au seuil de 70% requis.' ?>
                 </div>
             </div>
             <?php endif; /* fin synth_form */ ?>
 
             <?php
             /* ══════════════════════════════════════════════
-               AS / INST / SENS / IF — réponses directes
+               AS / INST / SENS / IF -réponses directes
             ══════════════════════════════════════════════ */
             elseif (!empty($ex['reponses'])): ?>
 
@@ -1057,7 +1057,7 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
             <div class="synth-block">
                 <div class="synth-head">
                     <i class="fas fa-clipboard-check"></i>
-                    <h4>Synthèse — Certification IF</h4>
+                    <h4>Synthèse -Certification IF</h4>
                     <div class="savg">
                         <?= ($si['moy']!==null)?$si['moy'].'% moyenne':'' ?>
                     </div>
@@ -1115,8 +1115,8 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
                 <div class="<?= $si['reussite']?'sfoot-ok':'sfoot-ko' ?>">
                     <i class="fas fa-<?= $si['reussite']?'check-circle':'times-circle' ?>"></i>
                     <?= $si['reussite']
-                        ?'Certification IF VALIDÉE — Moyenne '.$si['moy'].'% ≥ 70% (théorie et pratique validées).'
-                        :'Certification IF NON VALIDÉE — Moyenne '.($si['moy']??'—').'% inférieure au seuil de 70% requis.' ?>
+                        ?'Certification IF VALIDÉE -Moyenne '.$si['moy'].'% ≥ 70% (théorie et pratique validées).'
+                        :'Certification IF NON VALIDÉE -Moyenne '.($si['moy']??'—').'% inférieure au seuil de 70% requis.' ?>
                 </div>
             </div>
             <?php endif; /* fin synth_if */ ?>
@@ -1138,10 +1138,10 @@ table.stbl .trow td{background:#f4f7fc;font-weight:800;}
     <!-- ── Pied de page ── -->
     <div class="doc-foot">
         <i class="fas fa-shield-halved" style="color:var(--gold);margin-right:5px;"></i>
-        Dossier généré depuis le système <strong>EXASUR</strong> — ANAC GABON
+        Dossier généré depuis le système <strong>EXASUR</strong> -ANAC GABON
         le <?= date('d/m/Y à H:i') ?><br>
         Direction de la Sûreté et de la Facilitation de l'Aviation Civile
-        &nbsp;·&nbsp; <em>Document confidentiel — ne pas diffuser</em>
+        &nbsp;·&nbsp; <em>Document confidentiel -ne pas diffuser</em>
     </div>
 
     </div><!-- /.doc-body -->

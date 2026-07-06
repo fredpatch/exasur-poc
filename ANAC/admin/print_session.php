@@ -1,6 +1,6 @@
 <?php
 /**
- * print_session.php — État de session ANAC GABON
+ * print_session.php -État de session ANAC GABON
  * - IF (theorie ou pratique) : affiche les 2 parties + synthèse
  * - FORM : colonnes par module + total
  * - AS/INST/SENS : tableau standard note + % + décision
@@ -44,7 +44,7 @@ if ($code_type === 'IF') {
     $sess_jumelle = $other;
 
     // Identifier qui est théorie et qui est pratique
-    if ($se['type_session'] === 'theorique') {
+    if ($se['type_session'] === 'theorie') {
         $sess_theo = $se;
         $sess_prat = $other;
     } else {
@@ -164,7 +164,7 @@ usort($classement, fn($a, $b) => $b['pct_tri'] <=> $a['pct_tri']);
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>Session <?= htmlspecialchars($se['nom_session']) ?> — ANAC</title>
+<title>Session <?= htmlspecialchars($se['nom_session']) ?> -ANAC</title>
 <link rel="icon" href="../assets/images/faviconLOGOANAC.ico">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
@@ -340,7 +340,7 @@ body { background: #f0f2f5; padding: 20px; }
   <?php if ($code_type === 'IF' && $sess_jumelle): ?>
   <button class="btn-p" style="background:#0056b3" onclick="window.open('print_session.php?id=<?= $sess_jumelle['id_session'] ?>','_blank')">
     <i class="fas fa-external-link-alt"></i>
-    Voir session <?= $sess_jumelle['type_session'] === 'theorique' ? 'Théorique' : 'Pratique' ?>
+    Voir session <?= $sess_jumelle['type_session'] === 'theorie' ? 'Théorique' : 'Pratique' ?>
   </button>
   <?php endif; ?>
 </div>
@@ -349,21 +349,21 @@ body { background: #f0f2f5; padding: 20px; }
   <img src="../assets/images/banierenteanac.png" alt="ANAC" class="header-img" onerror="this.style.display='none'">
 
   <?php if ($code_type === 'IF'): ?>
-  <div class="doc-title">RÉSULTATS SESSION — AGENT INSPECTION FILTRAGE (IF)</div>
+  <div class="doc-title">RÉSULTATS SESSION -AGENT INSPECTION FILTRAGE (IF)</div>
   <div class="doc-sub">
     <?= htmlspecialchars($se['nom_session']) ?>
     | Du <?= date('d/m/Y', strtotime($se['date_debut'])) ?> au <?= date('d/m/Y', strtotime($se['date_fin'])) ?>
-    | Partie : <?= $se['type_session'] === 'theorique' ? '📖 Théorique' : '🖼️ Pratique (Imagerie)' ?>
+    | Partie : <?= $se['type_session'] === 'theorie' ? '📖 Théorique' : '🖼️ Pratique (Imagerie)' ?>
   </div>
   <?php elseif ($code_type === 'FORM'): ?>
-  <div class="doc-title">RÉSULTATS SESSION — ÉVALUATION DE FORMATION (FORM)</div>
+  <div class="doc-title">RÉSULTATS SESSION -ÉVALUATION DE FORMATION (FORM)</div>
   <div class="doc-sub">
     <?= htmlspecialchars($se['nom_session']) ?>
     | <?= date('d/m/Y', strtotime($se['date_debut'])) ?>
     <?php if ($modules): ?> | Module : <?= htmlspecialchars($modules[0]['nom_module_fr'] ?? '') ?><?php endif; ?>
   </div>
   <?php else: ?>
-  <div class="doc-title">RÉSULTATS DE SESSION — <?= htmlspecialchars($se['tc'] . ' : ' . $se['tn']) ?></div>
+  <div class="doc-title">RÉSULTATS DE SESSION -<?= htmlspecialchars($se['tc'] . ' : ' . $se['tn']) ?></div>
   <div class="doc-sub">
     <?= htmlspecialchars($se['nom_session']) ?>
     | Du <?= date('d/m/Y', strtotime($se['date_debut'])) ?> au <?= date('d/m/Y', strtotime($se['date_fin'])) ?>
@@ -406,7 +406,7 @@ body { background: #f0f2f5; padding: 20px; }
         <th class="th-left">Candidat</th>
         <th>Code</th>
         <th>Organisme</th>
-        <?php if ($se['type_session'] === 'theorique'): ?>
+        <?php if ($se['type_session'] === 'theorie'): ?>
         <th>Note Théorie</th>
         <th>% Théorie</th>
         <th>Résultat Théorie</th>
@@ -434,7 +434,7 @@ body { background: #f0f2f5; padding: 20px; }
       $r     = $row['r_main'];
       $rj    = $row['r_jum'];
 
-      if ($se['type_session'] === 'theorique') {
+      if ($se['type_session'] === 'theorie') {
         $r_theo = $r;
         $r_prat = $rj;
       } else {
@@ -463,7 +463,7 @@ body { background: #f0f2f5; padding: 20px; }
       <td><?= $row['cand']['code_acces'] ?></td>
       <td style="font-size:.78rem;color:#6c7a8d"><?= htmlspecialchars($row['cand']['nomorga']??'—') ?></td>
 
-      <?php if ($se['type_session'] === 'theorique'): ?>
+      <?php if ($se['type_session'] === 'theorie'): ?>
       <td style="font-weight:700"><?= $r_theo ? round($r_theo['note_finale'],1).'/'.$r_theo['note_sur'].' pts' : '—' ?></td>
       <td class="<?= $pct_color($pct_theo) ?>"><?= $pct_theo !== null ? $pct_theo.'%' : '—' ?></td>
       <td><?= $pct_theo !== null ? ($theo_reussite ? '<span class="res-ok">✅ RÉUSSI</span>' : '<span class="res-ko">❌ AJOURNÉ</span>') : '—' ?></td>
@@ -616,7 +616,7 @@ body { background: #f0f2f5; padding: 20px; }
     <div class="synthese-title">
       <i class="fas fa-table-list"></i>
       TABLEAU DE SYNTHÈSE
-      — <?= htmlspecialchars($se['nom_session']) ?>
+      -<?= htmlspecialchars($se['nom_session']) ?>
     </div>
 
     <table class="synth-table">
@@ -631,7 +631,7 @@ body { background: #f0f2f5; padding: 20px; }
       <tbody>
         <tr>
           <td class="td-l">Type d'examen</span></td>
-          <td><strong><?= htmlspecialchars($se['tc'].' — '.$se['tn']) ?></strong></span></td>
+          <td><strong><?= htmlspecialchars($se['tc'].' -'.$se['tn']) ?></strong></span></td>
           <td class="td-l">Date(s) de session</span></td>
           <td><?= date('d/m/Y',strtotime($se['date_debut'])) ?> → <?= date('d/m/Y',strtotime($se['date_fin'])) ?></span></td>
         </tr>
@@ -681,7 +681,7 @@ body { background: #f0f2f5; padding: 20px; }
   </div>
 
   <div class="foot">
-    Document généré le <?= date('d/m/Y à H:i') ?> — Système EXASUR ANAC GABON — Confidentiel
+    Document généré le <?= date('d/m/Y à H:i') ?> -Système EXASUR ANAC GABON -Confidentiel
   </div>
 </div>
 </body>

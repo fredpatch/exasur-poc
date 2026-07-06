@@ -1,8 +1,9 @@
 <?php
 // Connexion aux bases de données
-$servername = "192.168.5.3";
+//$servername = "192.168.5.142";
+$servername = "192.168.5.3"; //BBD SERVAPI
 $port       = 3306;
-$username   = "root";
+$username   = "si_exam";
 $password   = "eth@n@2018";
 
 // Base principale du projet AIR SECURE
