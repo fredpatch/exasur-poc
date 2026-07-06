@@ -1,0 +1,7 @@
+CREATE DATABASE IF NOT EXISTS quiz_app_du;
+CREATE DATABASE IF NOT EXISTS si_anac;
+
+GRANT ALL PRIVILEGES ON quiz_app_du.* TO 'user_exam'@'%';
+GRANT ALL PRIVILEGES ON si_anac.* TO 'user_exam'@'%';
+
+FLUSH PRIVILEGES;
