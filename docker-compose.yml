@@ -1,0 +1,46 @@
+services:
+  php:
+    build: ./docker/php
+    container_name: exasur_php
+    volumes:
+      - ./:/var/www
+    depends_on:
+      - mariadb
+    networks:
+      - exasur-network
+
+  nginx:
+    image: nginx:latest
+    container_name: exasur_nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./:/var/www
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - php
+    networks:
+      - exasur-network
+
+  mariadb:
+    image: mariadb:10.11
+    container_name: exasur_mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: rootpassword123
+      MARIADB_DATABASE: quiz_app_du
+      MARIADB_USER: user_exam
+      MARIADB_PASSWORD: eth@n@2018
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./docker/mariadb/init:/docker-entrypoint-initdb.d
+    ports:
+      - "3308:3306"
+    networks:
+      - exasur-network
+
+networks:
+  exasur-network:
+
+volumes:
+  mariadb_data:
